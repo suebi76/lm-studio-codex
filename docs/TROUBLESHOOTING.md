@@ -10,12 +10,32 @@ Run the installer again if needed:
 .\install\install.ps1
 ```
 
+On macOS/Linux:
+
+```bash
+./install/install.sh
+```
+
+If the installer added `~/.local/bin` to your shell profile, open a new terminal or run `source ~/.zshrc` / `source ~/.bashrc`.
+
 ## `node` is missing
 
 Install Node.js LTS:
 
 ```powershell
 winget install OpenJS.NodeJS.LTS
+```
+
+On macOS with Homebrew:
+
+```bash
+brew install node
+```
+
+On Linux, use your distro package manager, for example:
+
+```bash
+sudo apt install nodejs npm
 ```
 
 Then open a new terminal.
@@ -33,6 +53,12 @@ Then open a new terminal.
 ## `lms` is missing
 
 Install LM Studio, open it once, and enable or install the LM Studio CLI from LM Studio's developer tools.
+
+On macOS/Linux, if LM Studio supports it on your install, you can also try:
+
+```bash
+npx lmstudio install-cli
+```
 
 Check:
 

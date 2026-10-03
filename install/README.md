@@ -1,17 +1,17 @@
-# LM Studio Codex CLI for Windows
+# LM Studio Codex CLI
 
-This folder contains a portable Windows setup for running Codex CLI against the model currently loaded in LM Studio.
+This folder contains a portable setup for running Codex CLI against the model currently loaded in LM Studio.
 
 ## Requirements
 
-- Windows
+- Windows, macOS, or Linux
 - LM Studio with the `lms` CLI enabled
 - Codex CLI installed and available as `codex`
 - Node.js available as `node`
 
 ## Install
 
-Run this from PowerShell:
+Windows PowerShell:
 
 ```powershell
 .\install\install.ps1
@@ -29,9 +29,35 @@ The installer prints every relevant step. If Node.js or Codex CLI is missing, yo
 .\install\install.ps1 -InstallMissing
 ```
 
+macOS/Linux:
+
+```bash
+./install/install.sh
+```
+
+If Node.js or Codex CLI is missing, the installer can try to install what it can:
+
+```bash
+./install/install.sh --install-missing
+```
+
 LM Studio still needs to be installed and opened by the user, because models and the `lms` CLI are managed by LM Studio itself.
 
 Then open a new VS Code terminal.
+
+## Uninstall
+
+Windows:
+
+```powershell
+.\install\uninstall.ps1
+```
+
+macOS/Linux:
+
+```bash
+./install/uninstall.sh
+```
 
 ## Use
 
@@ -51,6 +77,12 @@ To show the currently loaded model:
 
 ```powershell
 lm-studio-model -List
+```
+
+On macOS/Linux:
+
+```bash
+lm-studio-model --list
 ```
 
 If more than one LLM is loaded, the command stops and asks you to unload all but one model in LM Studio. This keeps the gateway predictable.
@@ -101,9 +133,21 @@ If `node` is missing:
 winget install OpenJS.NodeJS.LTS
 ```
 
+On macOS with Homebrew:
+
+```bash
+brew install node
+```
+
+On Linux, use your distro package manager, for example:
+
+```bash
+sudo apt install nodejs npm
+```
+
 If `codex` is missing after Node.js is installed:
 
-```powershell
+```bash
 npm install -g @openai/codex
 ```
 

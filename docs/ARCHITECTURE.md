@@ -25,8 +25,9 @@ Loaded local model
 
 ## Files
 
-- `install/bin/` contains global command wrappers.
-- `install/lib/` contains PowerShell orchestration and the Node.js gateway.
+- `install/bin/` contains Windows command wrappers.
+- `install/bin-unix/` contains macOS/Linux command wrappers.
+- `install/lib/` contains PowerShell orchestration, shell orchestration, and the Node.js gateway.
 - `install/templates/config.toml` is copied into runtime state as the Codex config.
 - `install/state/` is runtime state and is ignored by Git.
 - `install/logs/` is runtime logging and is ignored by Git.
@@ -48,6 +49,8 @@ The system/developer message handling is important for models whose chat templat
 The supported workflow is one loaded LLM in LM Studio.
 
 The command stops when zero or multiple LLMs are loaded. This is intentional because a local coding agent should not silently pick the wrong model.
+
+Windows and macOS/Linux share the same runtime state file, gateway, and Codex config template. The platform scripts only differ in how they install global commands and manage the gateway process.
 
 ## Ports
 

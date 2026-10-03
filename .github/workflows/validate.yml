@@ -33,15 +33,27 @@ jobs:
         shell: pwsh
         run: node --check install/lib/lmstudio-responses-gateway.js
 
+      - name: Check shell script syntax
+        shell: bash
+        run: |
+          bash -n install/install.sh
+          bash -n install/uninstall.sh
+          find install/bin-unix -type f -print0 | xargs -0 -n1 bash -n
+          find install/bin-unix install/lib -name '*.sh' -print0 | xargs -0 -n1 bash -n
+
       - name: Check required package files
         shell: pwsh
         run: |
           $required = @(
             "install/install.ps1",
             "install/install.bat",
+            "install/install.sh",
+            "install/uninstall.sh",
             "install/bin/lm-studio.ps1",
             "install/bin/lm-studio.cmd",
+            "install/bin-unix/lm-studio",
             "install/lib/common.ps1",
+            "install/lib/common.sh",
             "install/lib/lmstudio-responses-gateway.js",
             "install/templates/config.toml"
           )

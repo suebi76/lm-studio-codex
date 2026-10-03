@@ -48,6 +48,12 @@ lm-studio-model
 lm-studio-model -List
 ```
 
+On macOS/Linux:
+
+```bash
+lm-studio-model --list
+```
+
 The tool expects one loaded LLM. If several are loaded, unload all but one in LM Studio.
 
 ## `lm-studio-stop`
@@ -69,3 +75,19 @@ lm-studio-app
 ```
 
 It starts the same gateway and opens the Desktop app through `codex app`. The CLI path is the supported path.
+
+## Installers
+
+Windows:
+
+```powershell
+.\install\install.ps1
+.\install\uninstall.ps1
+```
+
+macOS/Linux:
+
+```bash
+./install/install.sh
+./install/uninstall.sh
+```

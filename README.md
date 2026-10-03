@@ -2,16 +2,16 @@
 
 [![Validate](https://github.com/suebi76/lm-studio-codex/actions/workflows/validate.yml/badge.svg)](https://github.com/suebi76/lm-studio-codex/actions/workflows/validate.yml)
 
-Run Codex CLI from any Windows terminal while using the single model currently loaded in LM Studio.
+Run Codex CLI from any Windows, macOS, or Linux terminal while using the single model currently loaded in LM Studio.
 
 This project provides a small local gateway between Codex' Responses API and LM Studio's OpenAI-compatible chat endpoint. It is designed for the practical workflow: open a project in VS Code, load one model in LM Studio, type `lm-studio` in the VS Code terminal, and work with Codex in that folder.
 
 ## What This Is
 
-- A Windows-focused helper for Codex CLI + LM Studio.
-- A global `lm-studio` command for VS Code terminals and PowerShell.
+- A cross-platform helper for Codex CLI + LM Studio.
+- A global `lm-studio` command for VS Code terminals, PowerShell, bash, and zsh.
 - A local gateway that fixes model template issues such as Qwen's `System message must be at the beginning` error.
-- A portable `install/` folder that can be cloned to another Windows machine.
+- A portable `install/` folder that can be cloned to another machine.
 
 ## What This Is Not
 
@@ -21,7 +21,7 @@ This project provides a small local gateway between Codex' Responses API and LM 
 
 ## Requirements
 
-- Windows
+- Windows, macOS, or Linux
 - LM Studio with the `lms` CLI enabled
 - Node.js
 - Codex CLI
@@ -31,13 +31,15 @@ The installer checks these and prints concrete fixes if something is missing.
 
 ## Install
 
-Clone the repository, then run either:
+Clone the repository, then run the installer for your operating system.
+
+Windows:
 
 ```powershell
 .\install\install.ps1
 ```
 
-or double-click:
+Or double-click:
 
 ```text
 install\install.bat
@@ -47,6 +49,18 @@ If Node.js or Codex CLI is missing, the installer can try to install those:
 
 ```powershell
 .\install\install.ps1 -InstallMissing
+```
+
+macOS/Linux:
+
+```bash
+./install/install.sh
+```
+
+If Node.js or Codex CLI is missing, the installer can try to install what it can:
+
+```bash
+./install/install.sh --install-missing
 ```
 
 LM Studio itself still needs to be installed and opened by the user, because model loading and the `lms` CLI are managed by LM Studio.
@@ -76,6 +90,8 @@ lm-studio-model -List
 lm-studio-stop     # stop the local gateway
 lm-studio-app      # optional Desktop app experiment
 ```
+
+On macOS/Linux, use `lm-studio-model --list` instead of `-List`.
 
 ## Model Rule
 
