@@ -158,6 +158,46 @@ function Test-GatewayToolCalling {
     }
 }
 
+function Get-CodexSmokeStartCommand {
+    $exeCommand = Get-Command "codex.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($exeCommand -and $exeCommand.Source) {
+        return [pscustomobject]@{
+            FilePath = $exeCommand.Source
+            PrefixArgs = @()
+        }
+    }
+
+    $command = Get-Command "codex" -ErrorAction Stop | Select-Object -First 1
+    if ($command.CommandType -eq "Application") {
+        return [pscustomobject]@{
+            FilePath = $command.Source
+            PrefixArgs = @()
+        }
+    }
+
+    if ($command.CommandType -eq "ExternalScript") {
+        return [pscustomobject]@{
+            FilePath = "powershell"
+            PrefixArgs = @("-NoLogo", "-ExecutionPolicy", "Bypass", "-File", $command.Source)
+        }
+    }
+
+    throw "Unsupported Codex command type for smoke test: $($command.CommandType)"
+}
+
+function Join-ProcessArguments {
+    param([string[]] $Arguments)
+
+    $quoted = foreach ($argument in $Arguments) {
+        if ($argument -match '^[A-Za-z0-9_\-./:=]+$') {
+            $argument
+        } else {
+            '"' + ($argument -replace '\\', '\\' -replace '"', '\"') + '"'
+        }
+    }
+    return ($quoted -join " ")
+}
+
 function Test-CodexSmoke {
     if ($SkipCodexSmoke) {
         Write-DoctorWarn "Codex smoke test skipped by user"
@@ -176,9 +216,11 @@ function Test-CodexSmoke {
         if ($env:LMSTUDIO_CODEX_USE_DAEMON -eq "1") {
             $codexArgs = @("exec", "--skip-git-repo-check", "Reply exactly: LM_STUDIO_CODEX_DOCTOR_OK")
         }
+
+        $startCommand = Get-CodexSmokeStartCommand
         $process = Start-Process `
-            -FilePath "codex" `
-            -ArgumentList $codexArgs `
+            -FilePath $startCommand.FilePath `
+            -ArgumentList (Join-ProcessArguments @($startCommand.PrefixArgs + $codexArgs)) `
             -WorkingDirectory (Get-Location) `
             -RedirectStandardOutput $stdoutLog `
             -RedirectStandardError $stderrLog `
@@ -250,6 +292,22 @@ function Write-ModelRecommendation {
     Write-DoctorWarn "Unknown model family. If text, JSON, and tool-call checks pass, try it on small repo tasks first."
 }
 
+function Test-LmStudioRuntimeSettings {
+    param($Model)
+
+    if ($Model.contextLength -and [int64] $Model.contextLength -gt 32768) {
+        Write-DoctorWarn "LM Studio context length is $($Model.contextLength). For stable Codex workflows, start with 8192 or 16384."
+    }
+
+    if ($Model.parallel -and [int] $Model.parallel -gt 1) {
+        Write-DoctorWarn "LM Studio parallel requests is $($Model.parallel). For Codex, use Parallel = 1 while testing stability."
+    }
+
+    if ($Model.status -and ([string] $Model.status).ToLowerInvariant() -ne "idle") {
+        Write-DoctorWarn "LM Studio model status is '$($Model.status)'. Wait until it is IDLE or reload the model before starting Codex."
+    }
+}
+
 try {
     Write-Info "Running LM Studio Codex doctor..."
     Initialize-LmStudioCodexState
@@ -261,6 +319,7 @@ try {
     Write-DoctorPass "Preflight checks passed"
     Write-DoctorPass "Loaded model: $($selectedModel.identifier)"
     Write-ModelRecommendation $selectedModel.identifier
+    Test-LmStudioRuntimeSettings $selectedModel
 
     Write-Host ""
     Write-Host "Runtime checks:"

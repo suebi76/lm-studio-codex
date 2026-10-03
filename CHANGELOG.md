@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- No changes yet.
+- Fixed Windows `lm-studio-doctor` Codex smoke test startup when `codex` resolves to a PowerShell/npm shim.
+- Added Doctor warnings for high LM Studio context length, parallel requests, and non-idle model status.
 
 ## v0.3.0 - 2026-10-03
 
