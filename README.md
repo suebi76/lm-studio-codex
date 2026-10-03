@@ -9,6 +9,12 @@ Fuer GitHub und andere Windowsrechner ist der Ordner `install/` relevant. Er ent
 lm-studio
 ```
 
+For a guided Windows installer with a visible pause on errors, run:
+
+```text
+install\install.bat
+```
+
 Mehr Details: [install/README.md](install/README.md)
 
 ## Start

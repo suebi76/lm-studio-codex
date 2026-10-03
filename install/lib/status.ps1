@@ -4,9 +4,18 @@ $ErrorActionPreference = "Stop"
 Initialize-LmStudioCodexState
 $selected = Get-SelectedModelState
 $health = Get-GatewayHealth
+$missing = @(Get-MissingDependencyMessages)
 
 Write-Host "Install root: $script:InstallRoot"
 Write-Host "Codex home:   $script:CodexHome"
+if ($missing.Count -eq 0) {
+    Write-Host "Dependencies: OK"
+} else {
+    Write-Host "Dependencies: missing $($missing.Name -join ', ')"
+    foreach ($item in $missing) {
+        Write-Host "  - $($item.Fix)"
+    }
+}
 if ($selected) {
     Write-Host "Selected:     $($selected.id)"
 } else {
