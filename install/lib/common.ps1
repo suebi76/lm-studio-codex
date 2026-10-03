@@ -1,7 +1,13 @@
 $script:InstallRoot = Split-Path -Parent $PSScriptRoot
 $script:StateDir = Join-Path $script:InstallRoot "state"
 $script:LogDir = Join-Path $script:InstallRoot "logs"
-$script:CodexHome = Join-Path $script:StateDir "codex-home"
+if ($env:LMSTUDIO_CODEX_HOME) {
+    $script:CodexHome = $env:LMSTUDIO_CODEX_HOME
+} elseif ($env:LOCALAPPDATA) {
+    $script:CodexHome = Join-Path $env:LOCALAPPDATA "lmsc\c"
+} else {
+    $script:CodexHome = Join-Path $script:StateDir "codex-home"
+}
 $script:ModelStateFile = Join-Path $script:StateDir "selected-model.json"
 $script:GatewayUrl = "http://127.0.0.1:18123/health"
 $script:LmStudioBaseUrl = "http://127.0.0.1:1234"

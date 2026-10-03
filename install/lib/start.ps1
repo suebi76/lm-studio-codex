@@ -22,11 +22,16 @@ try {
     Write-Ok "Using LM Studio model: $($selectedModel.identifier)"
     Write-Info "Starting Codex in: $(Get-Location)"
 
-    if ($CodexArgs.Count -gt 0) {
-        & codex @CodexArgs
+    $finalArgs = @()
+    if ($env:LMSTUDIO_CODEX_USE_DAEMON -eq "1") {
+        Write-Warn "Codex daemon is enabled by LMSTUDIO_CODEX_USE_DAEMON=1. Portable installs in long paths may hit socket path limits."
     } else {
-        & codex
+        $finalArgs += "--no-daemon"
+        Write-Info "Running Codex with --no-daemon to avoid socket path limits in portable installs."
     }
+    $finalArgs += $CodexArgs
+
+    & codex @finalArgs
     exit $LASTEXITCODE
 } catch {
     Write-Host ""

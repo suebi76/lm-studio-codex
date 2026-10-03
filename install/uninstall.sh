@@ -7,7 +7,7 @@ USER_BIN_DIR="${HOME}/.local/bin"
 # shellcheck source=lib/common.sh
 . "$INSTALL_ROOT/lib/common.sh"
 
-commands=(lm-studio lm-studio-model lm-studio-status lm-studio-stop lm-studio-app)
+commands=(lm-studio lm-studio-doctor lm-studio-model lm-studio-status lm-studio-stop lm-studio-app)
 
 initialize_lmstudio_codex_state
 stop_gateway_on_port

@@ -51,9 +51,14 @@ jobs:
             "install/uninstall.sh",
             "install/bin/lm-studio.ps1",
             "install/bin/lm-studio.cmd",
+            "install/bin/lm-studio-doctor.ps1",
+            "install/bin/lm-studio-doctor.cmd",
             "install/bin-unix/lm-studio",
+            "install/bin-unix/lm-studio-doctor",
             "install/lib/common.ps1",
             "install/lib/common.sh",
+            "install/lib/doctor.ps1",
+            "install/lib/doctor.sh",
             "install/lib/lmstudio-responses-gateway.js",
             "install/templates/config.toml"
           )

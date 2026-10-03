@@ -20,8 +20,10 @@ What it does:
 - starts the LM Studio local server if needed
 - verifies exactly one LLM is loaded
 - starts the local gateway on `127.0.0.1:18123`
-- sets a project-specific `CODEX_HOME`
-- starts Codex
+- sets a short `CODEX_HOME`
+- starts Codex with `--no-daemon`
+
+The short `CODEX_HOME` and `--no-daemon` default avoid app-server socket and plugin-cache path errors in portable installs. To override the runtime path, set `LMSTUDIO_CODEX_HOME`. To force Codex daemon mode, set `LMSTUDIO_CODEX_USE_DAEMON=1` before running `lm-studio`.
 
 ## `lm-studio-status`
 
@@ -38,6 +40,55 @@ It prints:
 - dependency status
 - selected loaded model
 - gateway status
+
+## `lm-studio-doctor`
+
+Runs a practical health check for the loaded model and the local Codex workflow.
+
+```powershell
+lm-studio-doctor
+```
+
+On macOS/Linux:
+
+```bash
+lm-studio-doctor
+```
+
+It checks:
+
+- dependencies and LM Studio server
+- exactly one loaded LLM
+- gateway health
+- plain text response
+- simple JSON response
+- simple tool/function call response
+- Codex CLI smoke test
+
+To skip the Codex CLI smoke test:
+
+```powershell
+lm-studio-doctor -SkipCodexSmoke
+```
+
+On macOS/Linux:
+
+```bash
+lm-studio-doctor --skip-codex-smoke
+```
+
+Gateway runtime checks time out after 45 seconds by default. To give a very slow model more time:
+
+```powershell
+$env:LMSTUDIO_DOCTOR_TIMEOUT_SEC = "90"
+lm-studio-doctor
+```
+
+On macOS/Linux:
+
+```bash
+LMSTUDIO_DOCTOR_TIMEOUT_SEC=90 lm-studio-doctor
+```
 
 ## `lm-studio-model`
 

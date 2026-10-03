@@ -12,6 +12,8 @@ This project provides a small local gateway between Codex' Responses API and LM 
 - A global `lm-studio` command for VS Code terminals, PowerShell, bash, and zsh.
 - A local gateway that fixes model template issues such as Qwen's `System message must be at the beginning` error.
 - A portable `install/` folder that can be cloned to another machine.
+- A default `--no-daemon` Codex launch so portable installs in long paths do not hit socket path limits.
+- A short OS-local Codex runtime path to avoid Windows path-length problems from internal plugin/cache files.
 
 ## What This Is Not
 
@@ -80,10 +82,13 @@ lm-studio
 
 Codex starts in the current terminal folder and uses the loaded LM Studio model.
 
+`lm-studio` starts Codex with `--no-daemon` by default and uses a short OS-local Codex runtime path. This avoids app-server socket and plugin-cache path errors in portable folders, especially under long OneDrive paths on Windows.
+
 ## Commands
 
 ```powershell
 lm-studio          # start Codex CLI through LM Studio
+lm-studio-doctor   # test the loaded model/setup for Coding-Agent workflows
 lm-studio-status   # show install path, dependencies, selected model, gateway status
 lm-studio-model    # verify/select the single loaded model
 lm-studio-model -List
@@ -105,6 +110,7 @@ To change models, finish or stop the Codex run, unload the old model in LM Studi
 
 - [Install Guide](install/README.md)
 - [Command Reference](docs/COMMANDS.md)
+- [Model Recommendations](docs/MODEL_RECOMMENDATIONS.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 

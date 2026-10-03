@@ -4,6 +4,14 @@
 
 - No changes yet.
 
+## v0.3.0 - 2026-10-03
+
+- Added `lm-studio-doctor` for model/setup health checks.
+- Added model recommendation documentation.
+- Changed `lm-studio` and Doctor Codex smoke tests to use `codex --no-daemon` by default, avoiding socket path errors in long portable install paths.
+- Changed the default Codex runtime path to a short OS-local directory to avoid Windows plugin/cache path-length failures.
+- Added a configurable Doctor gateway timeout via `LMSTUDIO_DOCTOR_TIMEOUT_SEC`.
+
 ## v0.2.0 - 2026-10-03
 
 - Added macOS/Linux installer and shell command wrappers.

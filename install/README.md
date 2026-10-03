@@ -69,6 +69,44 @@ lm-studio
 
 This starts Codex CLI in the current folder and routes model requests through LM Studio.
 
+`lm-studio` starts Codex with `--no-daemon` by default and uses a short OS-local Codex runtime path. This avoids app-server socket and plugin-cache path errors in portable folders, especially under long OneDrive paths on Windows.
+
+Default Codex runtime paths:
+
+- Windows: `%LOCALAPPDATA%\lmsc\c`
+- macOS: `~/.lmsc/c`
+- Linux: `$XDG_STATE_HOME/lmsc/c` or `~/.local/state/lmsc/c`
+
+To override the Codex runtime path:
+
+```powershell
+$env:LMSTUDIO_CODEX_HOME = "C:\lmsc\c"
+```
+
+On macOS/Linux:
+
+```bash
+export LMSTUDIO_CODEX_HOME="$HOME/.lmsc/c"
+```
+
+To force the Codex daemon anyway, set:
+
+```powershell
+$env:LMSTUDIO_CODEX_USE_DAEMON = "1"
+```
+
+On macOS/Linux:
+
+```bash
+export LMSTUDIO_CODEX_USE_DAEMON=1
+```
+
+Before using a new model for longer agent work, run:
+
+```powershell
+lm-studio-doctor
+```
+
 ## Loaded model
 
 Load exactly one chat/instruct LLM in LM Studio. `lm-studio` automatically uses that loaded model.
@@ -101,6 +139,7 @@ To change models:
 ```powershell
 lm-studio-status
 lm-studio-stop
+lm-studio-doctor
 ```
 
 `lm-studio-status` shows:
@@ -110,6 +149,15 @@ lm-studio-stop
 - missing dependencies
 - loaded model selected for Codex
 - gateway status and active model
+
+`lm-studio-doctor` checks the same setup plus model behavior for text output, JSON output, tool-call output, and a small Codex CLI smoke test.
+
+Doctor gateway checks time out after 45 seconds by default. For slow models:
+
+```powershell
+$env:LMSTUDIO_DOCTOR_TIMEOUT_SEC = "90"
+lm-studio-doctor
+```
 
 ## What the commands check
 
@@ -172,4 +220,4 @@ install/state/
 install/logs/
 ```
 
-These folders should not be committed.
+These folders should not be committed. The Codex runtime cache is stored in the short OS-local path shown above.

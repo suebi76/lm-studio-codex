@@ -72,7 +72,7 @@ if ($PathParts -notcontains $BinDir) {
 $ShimDir = Join-Path $env:APPDATA "npm"
 New-Item -ItemType Directory -Force -Path $ShimDir | Out-Null
 
-$commands = @("lm-studio", "lm-studio-model", "lm-studio-status", "lm-studio-stop", "lm-studio-app")
+$commands = @("lm-studio", "lm-studio-doctor", "lm-studio-model", "lm-studio-status", "lm-studio-stop", "lm-studio-app")
 foreach ($command in $commands) {
     $ps1Target = Join-Path $BinDir "$command.ps1"
     $cmdTarget = Join-Path $BinDir "$command.cmd"

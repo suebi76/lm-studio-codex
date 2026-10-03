@@ -102,7 +102,7 @@ else
   write_ok "All required commands are already available"
 fi
 
-commands=(lm-studio lm-studio-model lm-studio-status lm-studio-stop lm-studio-app)
+commands=(lm-studio lm-studio-doctor lm-studio-model lm-studio-status lm-studio-stop lm-studio-app)
 for command_name in "${commands[@]}"; do
   target="$BIN_DIR/$command_name"
   link="$USER_BIN_DIR/$command_name"

@@ -4,7 +4,13 @@ COMMON_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_ROOT="$(CDPATH= cd -- "$COMMON_DIR/.." && pwd)"
 STATE_DIR="$INSTALL_ROOT/state"
 LOG_DIR="$INSTALL_ROOT/logs"
-CODEX_HOME_DIR="$STATE_DIR/codex-home"
+if [ -n "${LMSTUDIO_CODEX_HOME:-}" ]; then
+  CODEX_HOME_DIR="$LMSTUDIO_CODEX_HOME"
+elif [ "$(uname -s)" = "Darwin" ]; then
+  CODEX_HOME_DIR="$HOME/.lmsc/c"
+else
+  CODEX_HOME_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/lmsc/c"
+fi
 MODEL_STATE_FILE="$STATE_DIR/selected-model.json"
 GATEWAY_URL="http://127.0.0.1:18123/health"
 LMSTUDIO_BASE_URL="${LMSTUDIO_BASE_URL:-http://127.0.0.1:1234}"
