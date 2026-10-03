@@ -238,7 +238,7 @@ function Test-CodexSmoke {
             $stdout = Get-Content -LiteralPath $stdoutLog -Raw -ErrorAction SilentlyContinue
         }
 
-        if ($process.ExitCode -eq 0 -and $stdout -match "LM_STUDIO_CODEX_DOCTOR_OK") {
+        if ($stdout -match "LM_STUDIO_CODEX_DOCTOR_OK") {
             Write-DoctorPass "Codex CLI can complete a simple request through LM Studio"
             return
         }
