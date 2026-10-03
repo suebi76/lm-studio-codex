@@ -1,0 +1,86 @@
+# LM Studio Codex CLI for Windows
+
+This folder contains a portable Windows setup for running Codex CLI against the model currently loaded in LM Studio.
+
+## Requirements
+
+- Windows
+- LM Studio with the `lms` CLI enabled
+- Codex CLI installed and available as `codex`
+- Node.js available as `node`
+
+## Install
+
+Run this from PowerShell:
+
+```powershell
+.\install\install.ps1
+```
+
+Then open a new VS Code terminal.
+
+## Use
+
+In any project folder:
+
+```powershell
+lm-studio
+```
+
+This starts Codex CLI in the current folder and routes model requests through LM Studio.
+
+## Multiple loaded models
+
+If LM Studio has one LLM loaded, it is selected automatically. If several LLMs are loaded, run:
+
+```powershell
+lm-studio-model
+```
+
+To list loaded models:
+
+```powershell
+lm-studio-model -List
+```
+
+To select a loaded model by identifier:
+
+```powershell
+lm-studio-model "model-identifier"
+```
+
+## Switch model during a Codex session
+
+Open a second terminal and run:
+
+```powershell
+lm-studio-model
+```
+
+The running gateway reads the selected model before each Codex request, so the next request in the active session uses the newly selected model.
+
+## Status and stop
+
+```powershell
+lm-studio-status
+lm-studio-stop
+```
+
+## Optional desktop app experiment
+
+```powershell
+lm-studio-app
+```
+
+The CLI path is the reliable path. The desktop app command starts the same gateway and opens the ChatGPT/Codex desktop app for testing.
+
+## Runtime state
+
+The installer stores runtime state under:
+
+```text
+install/state/
+install/logs/
+```
+
+These folders should not be committed.
