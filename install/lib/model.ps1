@@ -1,5 +1,4 @@
 param(
-    [string] $Model,
     [switch] $List
 )
 
@@ -32,12 +31,8 @@ try {
         exit 0
     }
 
-    $selected = Select-LmStudioModel -RequestedModel $Model -ForcePrompt:([string]::IsNullOrWhiteSpace($Model))
-    Write-Ok "Selected LM Studio model for Codex: $($selected.identifier)"
-    $health = Get-GatewayHealth
-    if ($health) {
-        Write-Info "The running gateway will use this model on the next Codex request."
-    }
+    $selected = Select-LmStudioModel
+    Write-Ok "Current LM Studio model for Codex: $($selected.identifier)"
 } catch {
     Write-Host ""
     Write-Host "[lm-studio] Model selection failed." -ForegroundColor Red

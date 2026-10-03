@@ -185,7 +185,7 @@ async function loadedModel() {
 
   if (loaded.length > 1) {
     throw new Error(
-      `Multiple LLMs are loaded in LM Studio (${loaded.join(", ")}). Run lm-studio-model to choose one.`
+      `Multiple LLMs are loaded in LM Studio (${loaded.join(", ")}). Unload all but one model, then run lm-studio again.`
     );
   }
 

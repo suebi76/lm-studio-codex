@@ -43,35 +43,26 @@ lm-studio
 
 This starts Codex CLI in the current folder and routes model requests through LM Studio.
 
-## Multiple loaded models
+## Loaded model
 
-If LM Studio has one LLM loaded, it is selected automatically. If several LLMs are loaded, run:
+Load exactly one chat/instruct LLM in LM Studio. `lm-studio` automatically uses that loaded model.
 
-```powershell
-lm-studio-model
-```
-
-To list loaded models:
+To show the currently loaded model:
 
 ```powershell
 lm-studio-model -List
 ```
 
-To select a loaded model by identifier:
+If more than one LLM is loaded, the command stops and asks you to unload all but one model in LM Studio. This keeps the gateway predictable.
 
-```powershell
-lm-studio-model "model-identifier"
-```
+## Change model
 
-## Switch model during a Codex session
+To change models:
 
-Open a second terminal and run:
-
-```powershell
-lm-studio-model
-```
-
-The running gateway reads the selected model before each Codex request, so the next request in the active session uses the newly selected model.
+1. Stop or finish the current Codex run.
+2. In LM Studio, unload the old model.
+3. Load the new model.
+4. Run `lm-studio` again.
 
 ## Status and stop
 
@@ -85,7 +76,7 @@ lm-studio-stop
 - install root
 - Codex home used by this setup
 - missing dependencies
-- selected model
+- loaded model selected for Codex
 - gateway status and active model
 
 ## What the commands check
@@ -97,6 +88,7 @@ Every start checks:
 - `lms` is available
 - LM Studio server responds on `http://127.0.0.1:1234`
 - at least one LLM is loaded in LM Studio
+- no more than one LLM is loaded in LM Studio
 - the local gateway on port `18123` is running and belongs to this install
 
 If any check fails, the command prints a concrete fix instead of failing silently.

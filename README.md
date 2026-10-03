@@ -58,9 +58,9 @@ lm-studio-stop
 
 Aktuelle Codex-Versionen erwarten einen Responses-kompatiblen Provider. Manche LM-Studio-Modelle, darunter das getestete Qwen-Modell, stolpern beim direkten Responses-Pfad ueber ihr Chat-Template. Der Gateway setzt System- und Developer-Nachrichten an den Anfang und reicht Tool-Calls an Codex zurueck.
 
-## Mehrere geladene Modelle
+## Modell
 
-Wenn mehrere LLMs in LM Studio geladen sind, fragt der Starter nach der Nummer des Modells.
+Der Starter erwartet genau ein geladenes Chat/Instruct-Modell in LM Studio. Wenn mehrere LLMs geladen sind, stoppt der Start mit einer klaren Meldung und fordert dich auf, alle bis auf eines zu entladen.
 
 ## Test
 

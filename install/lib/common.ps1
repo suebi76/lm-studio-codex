@@ -235,38 +235,16 @@ function Select-LmStudioModel {
         )
     }
 
-    $current = Get-SelectedModelState
-    if (-not $ForcePrompt -and $current -and $current.id) {
-        $currentLoaded = @($loadedModels | Where-Object { $_.identifier -eq $current.id })
-        if ($currentLoaded.Count -eq 1) {
-            Write-Ok "Using previously selected model: $($currentLoaded[0].identifier)"
-            return $currentLoaded[0]
-        }
-        Write-Warn "Previously selected model is no longer loaded: $($current.id)"
-    }
-
-    if (-not $ForcePrompt -and $loadedModels.Count -eq 1) {
+    if ($loadedModels.Count -eq 1) {
         Save-SelectedModel $loadedModels[0]
         Write-Ok "Selected the only loaded model: $($loadedModels[0].identifier)"
         return $loadedModels[0]
     }
 
-    Write-Info "Several LM Studio models are loaded. Choose the one Codex should use:"
-    for ($i = 0; $i -lt $loadedModels.Count; $i++) {
-        $n = $i + 1
-        Write-Host "[$n] $($loadedModels[$i].identifier) - $($loadedModels[$i].displayName)"
-    }
-
-    do {
-        $choice = Read-Host "Use which model number for Codex?"
-        $parsed = 0
-        $valid = [int]::TryParse($choice, [ref] $parsed)
-    } while (-not $valid -or $parsed -lt 1 -or $parsed -gt $loadedModels.Count)
-
-    $selected = $loadedModels[$parsed - 1]
-    Save-SelectedModel $selected
-    Write-Ok "Selected model: $($selected.identifier)"
-    return $selected
+    Stop-WithHelp "More than one LLM is loaded in LM Studio." @(
+        "Unload all but one model in LM Studio.",
+        "Run 'lm-studio' again after only the intended model is loaded."
+    )
 }
 
 function Ensure-Gateway {
