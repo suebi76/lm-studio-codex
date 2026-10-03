@@ -1,0 +1,53 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse PowerShell files
+        shell: pwsh
+        run: |
+          $errors = @()
+          Get-ChildItem -Recurse -Filter *.ps1 | ForEach-Object {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
+            if ($parseErrors) {
+              foreach ($error in $parseErrors) {
+                $errors += "$($_.FullName): $($error.Message)"
+              }
+            }
+          }
+          if ($errors.Count) {
+            $errors | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+
+      - name: Check gateway JavaScript syntax
+        shell: pwsh
+        run: node --check install/lib/lmstudio-responses-gateway.js
+
+      - name: Check required package files
+        shell: pwsh
+        run: |
+          $required = @(
+            "install/install.ps1",
+            "install/install.bat",
+            "install/bin/lm-studio.ps1",
+            "install/bin/lm-studio.cmd",
+            "install/lib/common.ps1",
+            "install/lib/lmstudio-responses-gateway.js",
+            "install/templates/config.toml"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path)) {
+              Write-Error "Missing required file: $path"
+              exit 1
+            }
+          }

@@ -1,73 +1,101 @@
-# LM Studio Codex Starter
+# LM Studio Codex
 
-Dieses Projekt startet Codex gegen das aktuell in LM Studio geladene Modell.
+[![Validate](https://github.com/suebi76/lm-studio-codex/actions/workflows/validate.yml/badge.svg)](https://github.com/suebi76/lm-studio-codex/actions/workflows/validate.yml)
 
-Fuer GitHub und andere Windowsrechner ist der Ordner `install/` relevant. Er enthaelt den portablen Installer, den Gateway und die globalen CLI-Befehle.
+Run Codex CLI from any Windows terminal while using the single model currently loaded in LM Studio.
+
+This project provides a small local gateway between Codex' Responses API and LM Studio's OpenAI-compatible chat endpoint. It is designed for the practical workflow: open a project in VS Code, load one model in LM Studio, type `lm-studio` in the VS Code terminal, and work with Codex in that folder.
+
+## What This Is
+
+- A Windows-focused helper for Codex CLI + LM Studio.
+- A global `lm-studio` command for VS Code terminals and PowerShell.
+- A local gateway that fixes model template issues such as Qwen's `System message must be at the beginning` error.
+- A portable `install/` folder that can be cloned to another Windows machine.
+
+## What This Is Not
+
+- It does not replace the normal ChatGPT chat model with LM Studio.
+- It is not a separate LM Studio version of the ChatGPT Desktop app.
+- It expects exactly one LLM loaded in LM Studio.
+
+## Requirements
+
+- Windows
+- LM Studio with the `lms` CLI enabled
+- Node.js
+- Codex CLI
+- One chat/instruct model loaded in LM Studio
+
+The installer checks these and prints concrete fixes if something is missing.
+
+## Install
+
+Clone the repository, then run either:
 
 ```powershell
 .\install\install.ps1
-lm-studio
 ```
 
-For a guided Windows installer with a visible pause on errors, run:
+or double-click:
 
 ```text
 install\install.bat
 ```
 
-Mehr Details: [install/README.md](install/README.md)
+If Node.js or Codex CLI is missing, the installer can try to install those:
 
-## Start
+```powershell
+.\install\install.ps1 -InstallMissing
+```
 
-1. LM Studio oeffnen.
-2. Ein LLM laden.
-3. `start-codex-lmstudio.bat` starten.
+LM Studio itself still needs to be installed and opened by the user, because model loading and the `lms` CLI are managed by LM Studio.
 
-Die Batch-Datei startet bei Bedarf den LM-Studio-Server, startet den lokalen Gateway und startet danach Codex.
+Open a new VS Code terminal after installation.
 
-Systemweit geht dasselbe aus jedem Terminal, z.B. aus dem VS-Code-Terminal im aktuellen Projektordner:
+## Use
+
+1. Open LM Studio.
+2. Load exactly one chat/instruct model.
+3. Open a project folder in VS Code.
+4. Run:
 
 ```powershell
 lm-studio
 ```
 
-Damit arbeitet Codex im aktuellen Terminalordner.
+Codex starts in the current terminal folder and uses the loaded LM Studio model.
 
-## Desktop-App-Versuch
-
-Der CLI-Weg ist der verlaessliche Weg. Fuer einen Desktop-App-Versuch gibt es zusaetzlich:
+## Commands
 
 ```powershell
-lm-studio-app
+lm-studio          # start Codex CLI through LM Studio
+lm-studio-status   # show install path, dependencies, selected model, gateway status
+lm-studio-model    # verify/select the single loaded model
+lm-studio-model -List
+lm-studio-stop     # stop the local gateway
+lm-studio-app      # optional Desktop app experiment
 ```
 
-Dieser Befehl startet den Gateway dauerhaft und oeffnet die ChatGPT/Codex Desktop App. Wenn die App bereits offen war, starte danach eine neue lokale Codex-Session. Den Gateway stoppst du mit:
+## Model Rule
 
-```powershell
-lm-studio-stop
-```
+Load exactly one LLM in LM Studio.
 
-## Dateien
+If no model is loaded, `lm-studio` stops and tells you to load one. If several LLMs are loaded, it stops and tells you to unload all but one. This keeps the gateway predictable.
 
-- `start-codex-lmstudio.bat` ist der normale Starter.
-- `scripts/start-codex-lmstudio.ps1` prueft LM Studio, waehlt das geladene Modell und startet Codex.
-- `scripts/lmstudio-responses-gateway.js` uebersetzt Codex Responses API nach LM Studio Chat Completions.
-- `.codex-home/config.toml` ist die projektlokale Codex-Konfiguration.
+To change models, finish or stop the Codex run, unload the old model in LM Studio, load the new model, then run `lm-studio` again.
 
-## Warum der Gateway noetig ist
+## Documentation
 
-Aktuelle Codex-Versionen erwarten einen Responses-kompatiblen Provider. Manche LM-Studio-Modelle, darunter das getestete Qwen-Modell, stolpern beim direkten Responses-Pfad ueber ihr Chat-Template. Der Gateway setzt System- und Developer-Nachrichten an den Anfang und reicht Tool-Calls an Codex zurueck.
+- [Install Guide](install/README.md)
+- [Command Reference](docs/COMMANDS.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
 
-## Modell
+## Status
 
-Der Starter erwartet genau ein geladenes Chat/Instruct-Modell in LM Studio. Wenn mehrere LLMs geladen sind, stoppt der Start mit einer klaren Meldung und fordert dich auf, alle bis auf eines zu entladen.
+This is a local Windows helper around two fast-moving tools: Codex CLI and LM Studio. The CLI workflow is the supported path. The `lm-studio-app` command is included as an experiment for the ChatGPT/Codex Desktop app.
 
-## Test
+## License
 
-Ein schneller Test aus diesem Ordner:
-
-```powershell
-cmd /c start-codex-lmstudio.bat exec --skip-git-repo-check "Reply exactly: TEST_OK"
-```
-
-Der `exec`-Modus von Codex ist restriktiver als eine interaktive Coding-Session. Fuer echte Agent-Arbeit starte einfach die Batch-Datei ohne Zusatzargumente.
+MIT. See [LICENSE](LICENSE).
