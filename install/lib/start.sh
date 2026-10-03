@@ -18,11 +18,11 @@ main() {
   write_info "Starting Codex in: $(pwd)"
 
   codex_args=()
-  if [ "${LMSTUDIO_CODEX_USE_DAEMON:-}" = "1" ]; then
-    write_warn "Codex daemon is enabled by LMSTUDIO_CODEX_USE_DAEMON=1. Portable installs in long paths may hit socket path limits."
-  else
+  if [ "${LMSTUDIO_CODEX_NO_DAEMON:-}" = "1" ]; then
     codex_args+=(--no-daemon)
-    write_info "Running Codex with --no-daemon to avoid socket path limits in portable installs."
+    write_warn "Running Codex with --no-daemon because LMSTUDIO_CODEX_NO_DAEMON=1 is set."
+  else
+    write_info "Running Codex with the standard interactive daemon. CODEX_HOME is short: $CODEX_HOME_DIR"
   fi
   codex_args+=("$@")
 

@@ -54,7 +54,7 @@ The command stops when zero or multiple LLMs are loaded. This is intentional bec
 
 Windows and macOS/Linux share the same model state file, gateway, and Codex config template. The platform scripts only differ in how they install global commands and manage the gateway process.
 
-`lm-studio` launches Codex with `--no-daemon` by default and sets a short `CODEX_HOME`. This avoids Codex app-server Unix socket path limits and Windows plugin/cache path-length failures in portable folders.
+`lm-studio` sets a short `CODEX_HOME`. This avoids Codex app-server Unix socket path limits and Windows plugin/cache path-length failures in portable folders.
 
 ## Ports
 

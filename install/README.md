@@ -69,7 +69,7 @@ lm-studio
 
 This starts Codex CLI in the current folder and routes model requests through LM Studio.
 
-`lm-studio` starts Codex with `--no-daemon` by default and uses a short OS-local Codex runtime path. This avoids app-server socket and plugin-cache path errors in portable folders, especially under long OneDrive paths on Windows.
+`lm-studio` uses a short OS-local Codex runtime path. This avoids app-server socket and plugin-cache path errors in portable folders, especially under long OneDrive paths on Windows.
 
 Default Codex runtime paths:
 
@@ -89,16 +89,16 @@ On macOS/Linux:
 export LMSTUDIO_CODEX_HOME="$HOME/.lmsc/c"
 ```
 
-To force the Codex daemon anyway, set:
+To force no-daemon mode for troubleshooting, set:
 
 ```powershell
-$env:LMSTUDIO_CODEX_USE_DAEMON = "1"
+$env:LMSTUDIO_CODEX_NO_DAEMON = "1"
 ```
 
 On macOS/Linux:
 
 ```bash
-export LMSTUDIO_CODEX_USE_DAEMON=1
+export LMSTUDIO_CODEX_NO_DAEMON=1
 ```
 
 Before using a new model for longer agent work, run:

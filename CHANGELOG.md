@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Changed `lm-studio` to use Codex's standard interactive daemon again now that the runtime path is short.
+- Added `LMSTUDIO_CODEX_NO_DAEMON=1` as the explicit troubleshooting opt-out.
 - Fixed Windows `lm-studio-doctor` Codex smoke test startup when `codex` resolves to a PowerShell/npm shim.
 - Fixed Windows `lm-studio-doctor` success detection when Codex writes the expected marker but PowerShell reports an empty process exit code.
 - Added Doctor warnings for high LM Studio context length, parallel requests, and non-idle model status.

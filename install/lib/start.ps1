@@ -23,11 +23,11 @@ try {
     Write-Info "Starting Codex in: $(Get-Location)"
 
     $finalArgs = @()
-    if ($env:LMSTUDIO_CODEX_USE_DAEMON -eq "1") {
-        Write-Warn "Codex daemon is enabled by LMSTUDIO_CODEX_USE_DAEMON=1. Portable installs in long paths may hit socket path limits."
-    } else {
+    if ($env:LMSTUDIO_CODEX_NO_DAEMON -eq "1") {
         $finalArgs += "--no-daemon"
-        Write-Info "Running Codex with --no-daemon to avoid socket path limits in portable installs."
+        Write-Warn "Running Codex with --no-daemon because LMSTUDIO_CODEX_NO_DAEMON=1 is set."
+    } else {
+        Write-Info "Running Codex with the standard interactive daemon. CODEX_HOME is short: $script:CodexHome"
     }
     $finalArgs += $CodexArgs
 

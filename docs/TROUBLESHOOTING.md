@@ -121,7 +121,7 @@ install/logs/
 
 This is a Codex app-server daemon socket path limit, not an LM Studio model problem. It can happen when the portable install lives under a long folder such as OneDrive.
 
-Current versions of `lm-studio` start Codex with `--no-daemon` by default and use a short OS-local Codex runtime path to avoid this.
+Current versions of `lm-studio` use a short OS-local Codex runtime path to avoid this.
 
 If you still see this error:
 
@@ -133,10 +133,10 @@ lm-studio
 
 If you installed from a release zip, download the newest release and replace the old folder.
 
-Only force daemon mode if you intentionally want it:
+Only force no-daemon mode if you intentionally want it for troubleshooting:
 
 ```powershell
-$env:LMSTUDIO_CODEX_USE_DAEMON = "1"
+$env:LMSTUDIO_CODEX_NO_DAEMON = "1"
 lm-studio
 ```
 
@@ -160,7 +160,7 @@ lm-studio
 On macOS/Linux:
 
 ```bash
-export LMSTUDIO_CODEX_USE_DAEMON=1
+export LMSTUDIO_CODEX_NO_DAEMON=1
 lm-studio
 ```
 
