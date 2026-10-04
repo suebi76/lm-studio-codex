@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const http = require("node:http");
+const https = require("node:https");
 const { once } = require("node:events");
 const { createHash } = require("node:crypto");
 
@@ -235,6 +236,32 @@ async function modelList() {
   };
 }
 
+// Native HTTP avoids fetch's independent five-minute body/header idle limits.
+// The caller's AbortSignal owns the complete generation budget and cancellation.
+async function generationRequest(url, options) {
+  const address = new URL(url);
+  const transport = address.protocol === "https:" ? https : http;
+  const incoming = await new Promise((resolve, reject) => {
+    const request = transport.request(address, {
+      method: options.method, headers: options.headers, signal: options.signal,
+    }, resolve);
+    request.on("error", reject);
+    request.end(options.body);
+  });
+  async function text() {
+    const chunks = [];
+    let size = 0;
+    for await (const chunk of incoming) {
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) { incoming.destroy(); throw new Error("LM Studio response exceeds 16 MiB."); }
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks).toString("utf8");
+  }
+  return { ok: incoming.statusCode >= 200 && incoming.statusCode < 300,
+    status: incoming.statusCode, body: incoming, text, json: async () => JSON.parse(await text()) };
+}
+
 async function handleResponses(req, res) {
   const body = await readRequestBody(req);
   const model = await loadedModel();
@@ -285,7 +312,7 @@ async function handleResponses(req, res) {
   if (typeof body.temperature === "number") chatBody.temperature = body.temperature;
   if (typeof body.max_output_tokens === "number") chatBody.max_tokens = body.max_output_tokens;
 
-  const upstream = await fetch(`${LMSTUDIO_BASE_URL}/v1/chat/completions`, {
+  const upstream = await generationRequest(`${LMSTUDIO_BASE_URL}/v1/chat/completions`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(chatBody),
@@ -342,7 +369,7 @@ async function handleResponses(req, res) {
 }
 
 async function forwardResponses(body, model, res, signal) {
-  const upstream = await fetch(`${LMSTUDIO_BASE_URL}/v1/responses`, {
+  const upstream = await generationRequest(`${LMSTUDIO_BASE_URL}/v1/responses`, {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ ...body, model, stream: body.stream !== false }), signal,
   });

@@ -32,6 +32,11 @@ before(async () => {
     if (mode === 'http-error') { res.writeHead(400); res.end('context window exceeded'); return; }
     if (mode === 'hang') { req.on('close', () => { disconnected = true; }); res.on('close', () => { disconnected = true; }); return; }
     res.setHeader('content-type', 'text/event-stream');
+    if (mode === 'hang-body') {
+      res.on('close', () => { disconnected = true; });
+      res.write('data: {"choices":[{"delta":{"content":"start"}}]}\n\n');
+      return;
+    }
     if (req.url === '/v1/responses') {
       if (mode === 'truncated') { res.end('data: {"type":"response.created"}\n\n'); return; }
       if (received.stream === false) { res.setHeader('content-type', 'application/json'); res.end('{"status":"completed","output":[]}'); return; }
@@ -146,6 +151,16 @@ test('native Responses transport preserves payload and terminal event', async ()
     assert.match(await (await request({ stream: true }, local.base)).text(), /response.failed/);
     mode = 'ok';
   } finally { local.child.kill(); await once(local.child, 'exit'); }
+});
+test('generation budget also aborts a stalled response body', async () => {
+  const local = await startGateway('chat', 100);
+  try {
+    mode = 'hang-body'; disconnected = false;
+    const result = await request({ stream: true }, local.base);
+    assert.match(await result.text(), /response.failed/);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert.equal(disconnected, true);
+  } finally { mode = 'ok'; local.child.kill(); await once(local.child, 'exit'); }
 });
 test('parallel call history is a single assistant turn', () => {
   const messages = convertResponsesInputToChat({ input: [
