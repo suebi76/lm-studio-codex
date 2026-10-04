@@ -29,7 +29,7 @@ function Try-InstallMissingDependency {
     if ($Name -eq "Codex CLI") {
         if (Get-Command npm -ErrorAction SilentlyContinue) {
             Write-Info "Installing Codex CLI with npm..."
-            & npm install -g @openai/codex
+            & npm install -g @openai/codex@0.160.0
             if ($LASTEXITCODE -ne 0) { Write-Warn "Codex installation failed (exit $LASTEXITCODE). Check npm output above." }
             return
         }

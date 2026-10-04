@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - Reliability Review
+## v0.4.0 - 2026-10-04
 
 - Shared Node.js session launcher with explicit session resumption, visible output/progress, exit codes and empty-answer detection.
 - Discover the live model on each request; retain sessions across model changes and pass loaded context sizes when available.
@@ -12,6 +12,8 @@
 - Replace duplicated Doctors with shared streamed checks, a tool-result round trip and final-answer verification through the actual Codex CLI.
 - Require Node.js 22+, bound lms operations, and remove misleading model-family guarantees and desktop-app launch claims.
 - Add protocol/session regression tests and a three-platform CI matrix, plus an opt-in real Codex integration test.
+- Preserve Windows argument quoting and empty argument lists across PowerShell versions.
+- Allow 300 seconds per Doctor check, show ongoing progress, and pin automatic Codex installation to tested 0.160.0.
 
 ## v0.3.0 - 2026-10-03
 

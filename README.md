@@ -66,6 +66,8 @@ If Node.js or Codex CLI is missing, the installer can try to install what it can
 
 LM Studio itself still needs to be installed and opened by the user, because model loading and the `lms` CLI are managed by LM Studio.
 
+Automatic Codex installation uses the tested version `0.160.0`. An existing Codex installation is left in place; run Doctor after updating it.
+
 Open a new VS Code terminal after installation.
 
 ## Use

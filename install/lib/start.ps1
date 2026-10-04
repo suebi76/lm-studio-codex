@@ -9,7 +9,7 @@ if (Get-Variable PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyCo
 . (Join-Path $PSScriptRoot "common.ps1")
 try {
     if ($env:LMSTUDIO_CODEX_ARGS_JSON) {
-        $CodexArgs = @($env:LMSTUDIO_CODEX_ARGS_JSON | ConvertFrom-Json)
+        $CodexArgs = [string[]]($env:LMSTUDIO_CODEX_ARGS_JSON | ConvertFrom-Json)
         Remove-Item Env:LMSTUDIO_CODEX_ARGS_JSON
     }
     if ($CodexArgs.Count -eq 1 -and $CodexArgs[0] -in @("--help", "-h", "help")) {

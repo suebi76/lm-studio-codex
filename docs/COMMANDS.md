@@ -39,7 +39,7 @@ Stop only terminates this installation's verified gateway; LM Studio remains run
 | LMSTUDIO_BASE_URL | http://127.0.0.1:1234 | LM Studio server base URL |
 | LMSTUDIO_CODEX_TRANSPORT | chat | chat translation or native responses |
 | LMSTUDIO_CODEX_TIMEOUT_MS | 600000 | Maximum duration of one gateway request |
-| LMSTUDIO_DOCTOR_TIMEOUT_SEC | 120 | Maximum duration of each diagnostic request |
+| LMSTUDIO_DOCTOR_TIMEOUT_SEC | 300 | Maximum duration of each diagnostic request |
 
 PowerShell example:
 

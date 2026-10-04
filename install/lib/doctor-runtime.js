@@ -4,7 +4,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { parseSse } = require('./lmstudio-responses-gateway');
 const { resolveCodex, defaults } = require('./run-codex');
-const seconds = Number(process.env.LMSTUDIO_DOCTOR_TIMEOUT_SEC || 120);
+const seconds = Number(process.env.LMSTUDIO_DOCTOR_TIMEOUT_SEC || 300);
 if (!Number.isFinite(seconds) || seconds <= 0) throw new Error('LMSTUDIO_DOCTOR_TIMEOUT_SEC must be positive.');
 let warnings = 0;
 const warn = message => { warnings++; console.error(`[lm-studio] WARNING: ${message}`); };
@@ -82,4 +82,6 @@ async function main() {
   console.log(`[lm-studio] Doctor finished${warnings ? ` with ${warnings} warning(s)` : ' successfully'}. This is a basic capability test, not a guarantee for long agent tasks.`);
 }
 
-main().catch(error => { console.error(`[lm-studio] FAIL: ${error.message}`); process.exitCode = 1; });
+const started = Date.now();
+const progress = setInterval(() => console.error(`[lm-studio] Doctor is still working (${Math.round((Date.now() - started) / 1000)}s elapsed). Each check has a ${seconds}s limit.`), 15000);
+main().catch(error => { console.error(`[lm-studio] FAIL: ${error.message}`); process.exitCode = 1; }).finally(() => clearInterval(progress));

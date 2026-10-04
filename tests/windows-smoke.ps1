@@ -5,6 +5,13 @@ $ErrorActionPreference = 'Stop'
 function Test-CommandAvailable { param([string]$Name) return $true }
 Assert-Dependencies
 
+# PowerShell 5.1 emits a JSON array as one pipeline object. An extra @(...)
+# would turn [] into a single empty string when assigned to a string array.
+[string[]]$emptyArgs = ('[]' | ConvertFrom-Json)
+if ($emptyArgs.Count -ne 0) { throw 'Empty command arguments became a task.' }
+[string[]]$quotedArgs = ('["say \"hello\"", "--option"]' | ConvertFrom-Json)
+if ($quotedArgs.Count -ne 2 -or $quotedArgs[0] -ne 'say "hello"') { throw 'Argument quoting failed.' }
+
 $script:Stopped = @()
 function Get-CimInstance {
     @(

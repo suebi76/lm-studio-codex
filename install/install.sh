@@ -39,7 +39,7 @@ try_install_missing_dependency() {
     "Codex CLI")
       if command_available npm; then
         write_info "Installing Codex CLI with npm..."
-        npm install -g @openai/codex
+        npm install -g @openai/codex@0.160.0
       else
         write_warn "npm is not available. Install Node.js first, then run: npm install -g @openai/codex"
       fi

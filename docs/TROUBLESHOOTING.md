@@ -56,4 +56,6 @@ The helper never kills an arbitrary process on port 18123. Stop the other instal
 
 ## Slow Model
 
-Doctor defaults to 120 seconds per check. Increase `LMSTUDIO_DOCTOR_TIMEOUT_SEC` if needed; the gateway's total request limit is controlled separately by `LMSTUDIO_CODEX_TIMEOUT_MS`. A timeout does not by itself prove the model is unsuitable. Check LM Studio's own logs and hardware usage.
+Doctor defaults to 300 seconds per check and prints progress every 15 seconds. Increase `LMSTUDIO_DOCTOR_TIMEOUT_SEC` if needed; the gateway's total request limit is controlled separately by `LMSTUDIO_CODEX_TIMEOUT_MS`. A timeout does not by itself prove the model is unsuitable. Check LM Studio's own logs and hardware usage.
+
+Codex sends instructions and tool schemas even for a short greeting. In a measured Qwen run, roughly 6600 input tokens processed at about 50 tokens/second, exceeding a former 120-second smoke limit before generation began. Check LM Studio's prompt-processing progress before treating a quiet initial period as a disconnect.

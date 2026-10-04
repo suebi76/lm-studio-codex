@@ -17,7 +17,7 @@ This review removes several accumulated workarounds and adds regression coverage
 | Overly complex translation for compatible models | Optional native Responses forwarding | Native terminal/nonstream/truncation tests |
 | Hung requests and oversized payloads | Total timeout, disconnect cancellation, 16 MiB limit | Timeout and body-limit tests |
 | Killing foreign processes | Verify installation-owned process command; reject conflicts | Windows ownership test; Unix install test |
-| Reusing outdated gateways | Source hash and settings checked on startup | Lifecycle code review; diagnostic health metadata |
+| Reusing outdated gateways | Source hash and settings checked on startup; recover owned old gateways with broken health | Live Windows startup, reuse, stop and transport-change test |
 | Unix global command resolves wrong directory | Resolve symlinks before locating scripts | Unix installer smoke test |
 | Installer overwrites other commands | Ownership checks and meaningful exit status | Unix conflict/reinstall/uninstall test |
 | Doctor false positives | Stream completion, tool-result round trip, final-answer file plus exit code | Shared runtime diagnostics |
@@ -33,7 +33,8 @@ macOS/Linux: `bash tests/unix-install.sh`. GitHub Actions runs a Windows/macOS/L
 
 ## Remaining Limits
 
-- Run `lm-studio-doctor` with the actual loaded model on each target machine. At the local review's final smoke check, no model was loaded; no real-model success is claimed.
+- Windows live testing used the loaded Qwen 27B community GGUF, Q4_K_S, qwen35 architecture, with 262144 context and four parallel slots. Streaming, JSON, tool-result handling and a two-turn global-command session passed; the second turn correctly recalled a token from the first. Repeat Doctor on every target machine/model.
+- The first Codex smoke test hit the former 120-second limit while LM Studio was still processing its roughly 6600-token prompt at about 50 tokens/second. The diagnostic default is now 300 seconds with progress messages; this change does not claim to speed up the model.
 - Chat mode deliberately supports text and function tools. Native Responses capabilities depend on LM Studio and the model. There is no automatic cross-transport retry.
 - A smaller context window can invalidate an existing session's history. Start fresh when needed; the gateway does not silently discard it.
 - A model cannot be replaced during an active generation. Switch between tasks.
