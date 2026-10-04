@@ -6,11 +6,32 @@ on:
 
 jobs:
   validate:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Protocol and session regression tests
+        run: node --test tests/*.test.js
+
+      - name: Unix installation and global symlink test
+        if: runner.os != 'Windows'
+        shell: bash
+        run: bash tests/unix-install.sh
+
+      - name: Windows PowerShell 5.1 startup checks
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./tests/windows-smoke.ps1
 
       - name: Parse PowerShell files
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $errors = @()
@@ -30,7 +51,6 @@ jobs:
           }
 
       - name: Check gateway JavaScript syntax
-        shell: pwsh
         run: node --check install/lib/lmstudio-responses-gateway.js
 
       - name: Check shell script syntax
@@ -42,6 +62,7 @@ jobs:
           find install/bin-unix install/lib -name '*.sh' -print0 | xargs -0 -n1 bash -n
 
       - name: Check required package files
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $required = @(

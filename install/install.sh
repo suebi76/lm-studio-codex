@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euo pipefail
 
 INSTALL_ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 BIN_DIR="$INSTALL_ROOT/bin-unix"
@@ -45,12 +45,7 @@ try_install_missing_dependency() {
       fi
       ;;
     "LM Studio CLI")
-      if command_available npx; then
-        write_info "Trying to install the LM Studio CLI with npx..."
-        npx lmstudio install-cli || write_warn "Could not install lms automatically. Enable/install the lms CLI from LM Studio."
-      else
-        write_warn "Install LM Studio manually from https://lmstudio.ai, open it once, and enable/install the lms CLI."
-      fi
+      write_warn "Open LM Studio and enable/install its lms CLI. Then open a new terminal."
       ;;
   esac
 }
@@ -106,7 +101,13 @@ commands=(lm-studio lm-studio-doctor lm-studio-model lm-studio-status lm-studio-
 for command_name in "${commands[@]}"; do
   target="$BIN_DIR/$command_name"
   link="$USER_BIN_DIR/$command_name"
-  rm -f "$link"
+  if [ -e "$link" ] || [ -L "$link" ]; then
+    if [ ! -L "$link" ] || [ "$(readlink "$link")" != "$target" ]; then
+      stop_with_help "Refusing to overwrite an unrelated command: $link" "Move or uninstall the old command first."
+      exit 1
+    fi
+    rm "$link"
+  fi
   ln -s "$target" "$link"
 done
 
@@ -139,7 +140,9 @@ if [ "${#missing_after[@]}" -gt 0 ]; then
   for item in "${missing_after[@]}"; do
     printf '  - %s: %s\n' "$item" "$(dependency_fix_message "$item")"
   done
+  exit 1
 else
+  assert_dependencies
   write_ok "Preflight passed. You can open a new VS Code terminal and run: lm-studio"
 fi
 

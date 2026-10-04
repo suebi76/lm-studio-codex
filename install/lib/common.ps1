@@ -10,7 +10,7 @@ if ($env:LMSTUDIO_CODEX_HOME) {
 }
 $script:ModelStateFile = Join-Path $script:StateDir "selected-model.json"
 $script:GatewayUrl = "http://127.0.0.1:18123/health"
-$script:LmStudioBaseUrl = "http://127.0.0.1:1234"
+$script:LmStudioBaseUrl = if ($env:LMSTUDIO_BASE_URL) { $env:LMSTUDIO_BASE_URL.TrimEnd('/') } else { "http://127.0.0.1:1234" }
 
 function Write-Info {
     param([string] $Message)
@@ -75,14 +75,12 @@ function Get-GatewayHealth {
 }
 
 function Stop-GatewayOnPort {
-    try {
-        $connections = @(Get-NetTCPConnection -LocalPort 18123 -State Listen -ErrorAction SilentlyContinue)
-        foreach ($connection in $connections) {
-            if ($connection.OwningProcess) {
-                Stop-Process -Id $connection.OwningProcess -Force -ErrorAction SilentlyContinue
-            }
+    $expectedScript = Join-Path $script:InstallRoot "lib\lmstudio-responses-gateway.js"
+    $processes = @(Get-CimInstance Win32_Process -Filter "name = 'node.exe'" -ErrorAction Stop)
+    foreach ($process in $processes) {
+        if ($process.CommandLine -and $process.CommandLine.Contains('"' + $expectedScript + '"')) {
+            Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
         }
-    } catch {
     }
 }
 
@@ -121,6 +119,8 @@ function Get-MissingDependencyMessages {
 function Assert-Dependencies {
     $missing = @(Get-MissingDependencyMessages)
     if ($missing.Count -eq 0) {
+        & node -e 'if(parseInt(process.versions.node) < 22) process.exit(1)'
+        if ($LASTEXITCODE -ne 0) { Stop-WithHelp "Node.js 22 or newer is required." @("Install Node.js LTS from https://nodejs.org") }
         Write-Ok "Required commands found: node, codex, lms"
         return
     }
@@ -136,7 +136,8 @@ function Assert-Dependencies {
 function Ensure-LmStudioServer {
     if (-not (Test-HttpOk "$script:LmStudioBaseUrl/v1/models")) {
         Write-Info "LM Studio server is not responding on $script:LmStudioBaseUrl. Starting it with lms..."
-        & lms server start | Out-Host
+        & node (Join-Path $PSScriptRoot "run-lms.js") server start | Out-Host
+        if ($LASTEXITCODE -ne 0) { Stop-WithHelp "LM Studio server could not be started." @("Open LM Studio manually and enable its local server.") }
 
         $ready = $false
         for ($i = 0; $i -lt 30; $i++) {
@@ -161,7 +162,7 @@ function Ensure-LmStudioServer {
 
 function Get-LoadedLmStudioModels {
     try {
-        $loadedJson = & lms ps --json
+        $loadedJson = (& node (Join-Path $PSScriptRoot "run-lms.js") ps --json) -join "`n"
     } catch {
         Stop-WithHelp "Could not run 'lms ps --json'." @(
             "Open LM Studio and make sure the lms CLI is enabled.",
@@ -258,11 +259,19 @@ function Ensure-Gateway {
 
     $health = Get-GatewayHealth
     $expectedStateFile = (Resolve-Path -LiteralPath $script:ModelStateFile).Path
+    $gatewayScript = Join-Path $script:InstallRoot "lib\lmstudio-responses-gateway.js"
+    $revision = (Get-FileHash -LiteralPath $gatewayScript -Algorithm SHA256).Hash.ToLowerInvariant()
+    $transport = if ($env:LMSTUDIO_CODEX_TRANSPORT) { $env:LMSTUDIO_CODEX_TRANSPORT } else { "chat" }
+    $timeout = if ($env:LMSTUDIO_CODEX_TIMEOUT_MS) { [double]$env:LMSTUDIO_CODEX_TIMEOUT_MS } else { 600000 }
     if ($health -and ($health.gateway -ne "lm-studio-codex-gateway" -or $health.stateFile -ne $expectedStateFile)) {
-        Write-Warn "Another process is using the Codex LM Studio gateway port. Restarting it..."
+        Stop-WithHelp "Port 18123 belongs to another service or installation." @("Stop that service from its owning installation, then retry. No foreign process was stopped.")
+    }
+    if ($health -and ($health.revision -ne $revision -or $health.baseUrl -ne $script:LmStudioBaseUrl -or $health.transport -ne $transport -or $health.timeoutMs -ne $timeout)) {
+        Write-Info "Restarting this installation's gateway after a code/configuration change..."
         Stop-GatewayOnPort
         Start-Sleep -Milliseconds 500
         $health = Get-GatewayHealth
+        if ($health) { Stop-WithHelp "The previous gateway did not stop." @("Run lm-studio-stop, inspect its message, then retry.") }
     }
 
     if ($health) {
@@ -270,13 +279,16 @@ function Ensure-Gateway {
         return
     }
 
-    $gatewayScript = Join-Path $script:InstallRoot "lib\lmstudio-responses-gateway.js"
+    # Older gateways cannot answer health checks when no model is loaded.
+    Stop-GatewayOnPort
+
     $stdoutLog = Join-Path $script:LogDir "gateway.out.log"
     $stderrLog = Join-Path $script:LogDir "gateway.err.log"
     $pidFile = Join-Path $script:LogDir "gateway.pid"
 
     $env:LMSTUDIO_BASE_URL = $script:LmStudioBaseUrl
     $env:LMSTUDIO_CODEX_MODEL_STATE_FILE = $script:ModelStateFile
+    $env:LMSTUDIO_CODEX_GATEWAY_PORT = "18123"
 
     Write-Info "Starting local Codex <-> LM Studio gateway on http://127.0.0.1:18123..."
     $process = Start-Process -FilePath "node" `
@@ -291,10 +303,12 @@ function Ensure-Gateway {
     $ready = $false
     for ($i = 0; $i -lt 30; $i++) {
         Start-Sleep -Milliseconds 300
-        if (Test-HttpOk $script:GatewayUrl) {
+        $startedHealth = Get-GatewayHealth
+        if ($startedHealth -and $startedHealth.pid -eq $process.Id -and $startedHealth.revision -eq $revision) {
             $ready = $true
             break
         }
+        if ($process.HasExited) { break }
     }
 
     if (-not $ready) {

@@ -24,7 +24,7 @@ This project provides a small local gateway between Codex' Responses API and LM 
 
 - Windows, macOS, or Linux
 - LM Studio with the `lms` CLI enabled
-- Node.js
+- Node.js 22 or newer
 - Codex CLI
 - One chat/instruct model loaded in LM Studio
 
@@ -79,20 +79,27 @@ Open a new VS Code terminal after installation.
 lm-studio
 ```
 
-Codex starts in the current terminal folder and uses the loaded LM Studio model.
+This starts a prompt loop in the current terminal folder. Each task runs through `codex exec`; subsequent tasks resume the exact same session. Codex can read, edit, and run commands in the project. Use `:new` to start fresh and `:exit` to quit. Tasks run with a workspace-write sandbox and no interactive approval prompts.
+
+For one-off tasks:
+
+```powershell
+lm-studio "Analysiere dieses Projekt und fasse den aktuellen Stand zusammen"
+```
 
 `lm-studio` uses a short OS-local Codex runtime path. This avoids app-server socket and plugin-cache path errors in portable folders, especially under long OneDrive paths on Windows.
 
 ## Commands
 
 ```powershell
-lm-studio          # start Codex CLI through LM Studio
+lm-studio          # start the stable Codex exec prompt loop through LM Studio
+lm-studio "task"   # run one Codex task through LM Studio
+lm-studio --tui    # optional/experimental Codex TUI, daemonless
 lm-studio-doctor   # test the loaded model/setup for Coding-Agent workflows
 lm-studio-status   # show install path, dependencies, selected model, gateway status
 lm-studio-model    # verify/select the single loaded model
 lm-studio-model -List
 lm-studio-stop     # stop the local gateway
-lm-studio-app      # optional Desktop app experiment
 ```
 
 On macOS/Linux, use `lm-studio-model --list` instead of `-List`.
@@ -103,7 +110,9 @@ Load exactly one LLM in LM Studio.
 
 If no model is loaded, `lm-studio` stops and tells you to load one. If several LLMs are loaded, it stops and tells you to unload all but one. This keeps the gateway predictable.
 
-To change models, finish or stop the Codex run, unload the old model in LM Studio, load the new model, then run `lm-studio` again.
+To change models, finish the current task, unload the old model, and load the new one. The next request discovers it automatically; the terminal session can stay open. If the new model has less context capacity, use `:new` as needed.
+
+The default gateway translates Chat Completions for strict model templates. An optional `LMSTUDIO_CODEX_TRANSPORT=responses` mode forwards to LM Studio's native Responses endpoint. See [Architecture](docs/ARCHITECTURE.md) for capabilities and limits. OpenAI-compatible endpoints must be enabled in LM Studio.
 
 ## Documentation
 
@@ -112,10 +121,11 @@ To change models, finish or stop the Codex run, unload the old model in LM Studi
 - [Model Recommendations](docs/MODEL_RECOMMENDATIONS.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Reliability Review](docs/RELIABILITY.md)
 
 ## Status
 
-This is a local Windows helper around two fast-moving tools: Codex CLI and LM Studio. The CLI workflow is the supported path. The `lm-studio-app` command is included as an experiment for the ChatGPT/Codex Desktop app.
+Windows, macOS and Linux share the Node.js gateway, launcher and Doctor. CI covers protocol regressions on all three platforms; actual model/hardware compatibility still requires `lm-studio-doctor` on each machine. The native CLI protocol is tested locally with Codex 0.160.0. The desktop-app experiment is retired.
 
 ## License
 

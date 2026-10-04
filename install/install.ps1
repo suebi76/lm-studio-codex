@@ -18,6 +18,8 @@ function Try-InstallMissingDependency {
         if (Get-Command winget -ErrorAction SilentlyContinue) {
             Write-Info "Installing Node.js LTS with winget..."
             & winget install --id OpenJS.NodeJS.LTS --source winget --accept-package-agreements --accept-source-agreements
+            if ($LASTEXITCODE -ne 0) { Write-Warn "Node installation failed (exit $LASTEXITCODE). Install Node.js LTS manually." }
+            $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
             return
         }
         Write-Warn "winget is not available. Install Node.js manually from https://nodejs.org"
@@ -28,6 +30,7 @@ function Try-InstallMissingDependency {
         if (Get-Command npm -ErrorAction SilentlyContinue) {
             Write-Info "Installing Codex CLI with npm..."
             & npm install -g @openai/codex
+            if ($LASTEXITCODE -ne 0) { Write-Warn "Codex installation failed (exit $LASTEXITCODE). Check npm output above." }
             return
         }
         Write-Warn "npm is not available. Install Node.js first, then run: npm install -g @openai/codex"
@@ -58,6 +61,7 @@ if ($missingBefore.Count -gt 0) {
 }
 
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
+Initialize-LmStudioCodexState
 $PathParts = @($UserPath -split ";" | Where-Object { $_ })
 
 if ($PathParts -notcontains $BinDir) {
@@ -78,16 +82,25 @@ foreach ($command in $commands) {
     $cmdTarget = Join-Path $BinDir "$command.cmd"
     $ps1Shim = Join-Path $ShimDir "$command.ps1"
     $cmdShim = Join-Path $ShimDir "$command.cmd"
+    foreach ($existing in @($ps1Shim, $cmdShim)) {
+        if ((Test-Path -LiteralPath $existing) -and (Get-Content -LiteralPath $existing -Raw) -notmatch 'LM Studio Codex|install[\\/]bin[\\/]lm-studio') {
+            throw "Refusing to overwrite an unrelated command: $existing"
+        }
+    }
+    $literalTarget = $ps1Target.Replace("'", "''")
 
     Set-Content -LiteralPath $ps1Shim -Encoding UTF8 -Value @"
 #!/usr/bin/env pwsh
-& "$ps1Target" @args
+# LM Studio Codex managed shim
+& '$literalTarget' @args
 exit `$LASTEXITCODE
 "@
 
     Set-Content -LiteralPath $cmdShim -Encoding ASCII -Value @"
 @echo off
-powershell -NoLogo -ExecutionPolicy Bypass -File "$ps1Target" %*
+rem LM Studio Codex managed shim
+powershell -NoLogo -ExecutionPolicy Bypass -File "%~dp0$command.ps1" %*
+exit /b %errorlevel%
 "@
 }
 
@@ -103,7 +116,9 @@ if ($missingAfter.Count -gt 0) {
     foreach ($item in $missingAfter) {
         Write-Host "  - $($item.Name): $($item.Fix)"
     }
+    exit 1
 } else {
+    Assert-Dependencies
     Write-Ok "Preflight passed. You can open a VS Code terminal and run: lm-studio"
 }
 

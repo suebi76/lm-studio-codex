@@ -3,11 +3,16 @@ model_provider = "lmstudio_gateway"
 model_reasoning_effort = "none"
 sandbox_mode = "workspace-write"
 approval_policy = "on-request"
+web_search = "disabled"
+
+[features]
+multi_agent = false
+plugins = false
 
 [model_providers.lmstudio_gateway]
 name = "LM Studio loaded model via local gateway"
 base_url = "http://127.0.0.1:18123/v1"
 wire_api = "responses"
 request_max_retries = 1
-stream_max_retries = 1
+stream_max_retries = 0
 stream_idle_timeout_ms = 600000

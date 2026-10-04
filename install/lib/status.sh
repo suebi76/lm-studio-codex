@@ -31,10 +31,10 @@ else
 fi
 
 gateway_port="$(get_gateway_health_field port 2>/dev/null || true)"
-gateway_model="$(get_gateway_health_field model 2>/dev/null || true)"
+gateway_model="$(http_get 'http://127.0.0.1:18123/ready' 2>/dev/null || true)"
 if [ -n "$gateway_port" ]; then
   printf 'Gateway:      running on port %s\n' "$gateway_port"
-  printf 'Gateway model:%s\n' "$gateway_model"
+  printf 'Live readiness: %s\n' "${gateway_model:-LM Studio/model is not ready}"
 else
   printf 'Gateway:      not running\n'
 fi

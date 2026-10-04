@@ -17,13 +17,17 @@ if ($missing.Count -eq 0) {
     }
 }
 if ($selected) {
-    Write-Host "Selected:     $($selected.id)"
+    Write-Host "Last selected (cached): $($selected.id)"
 } else {
     Write-Host "Selected:     none"
 }
 if ($health) {
     Write-Host "Gateway:      running on port $($health.port)"
-    Write-Host "Gateway model:$($health.model)"
+    Write-Host "Transport:    $($health.transport)"
+    try {
+        $ready = Invoke-RestMethod -Uri "http://127.0.0.1:18123/ready" -TimeoutSec 7
+        Write-Host "Live model:   $($ready.model)"
+    } catch { Write-Warn "Gateway is alive, but LM Studio/model is not ready: $($_.Exception.Message)" }
 } else {
     Write-Host "Gateway:      not running"
 }

@@ -1,11 +1,23 @@
 const fs = require("node:fs");
 const http = require("node:http");
+const { once } = require("node:events");
+const { createHash } = require("node:crypto");
 
 const PORT = Number(process.env.LMSTUDIO_CODEX_GATEWAY_PORT || 18123);
 const LMSTUDIO_BASE_URL = process.env.LMSTUDIO_BASE_URL || "http://127.0.0.1:1234";
-const FIXED_MODEL = process.env.LMSTUDIO_CODEX_MODEL || "";
 const MODEL_STATE_FILE = process.env.LMSTUDIO_CODEX_MODEL_STATE_FILE || "";
 const GATEWAY_ID = "lm-studio-codex-gateway";
+const REVISION = createHash("sha256").update(fs.readFileSync(__filename)).digest("hex");
+const TRANSPORT = process.env.LMSTUDIO_CODEX_TRANSPORT || "chat";
+const REQUEST_TIMEOUT_MS = Number(process.env.LMSTUDIO_CODEX_TIMEOUT_MS || 600000);
+if (!["chat", "responses"].includes(TRANSPORT) || !Number.isFinite(REQUEST_TIMEOUT_MS) || REQUEST_TIMEOUT_MS < 100) {
+  throw new Error("Invalid transport (use chat or responses) or LMSTUDIO_CODEX_TIMEOUT_MS (minimum 100).");
+}
+const MAX_BODY_BYTES = 16 * 1024 * 1024;
+
+function clientError(message, status = 400) {
+  return Object.assign(new Error(message), { status });
+}
 
 function json(res, status, body) {
   const payload = JSON.stringify(body);
@@ -26,6 +38,8 @@ function sseHeaders(res) {
 }
 
 function sse(res, event, data) {
+  data.sequence_number = res.sequenceNumber || 0;
+  res.sequenceNumber = data.sequence_number + 1;
   res.write(`event: ${event}\n`);
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
@@ -51,7 +65,8 @@ function textFromContent(content) {
       if (typeof part.text === "string") return part.text;
       if (typeof part.output_text === "string") return part.output_text;
       if (typeof part.input_text === "string") return part.input_text;
-      if (part.type === "input_image") return "[image]";
+      if (part.type === "input_image") throw clientError("Images require LMSTUDIO_CODEX_TRANSPORT=responses and a vision model.");
+      throw clientError(`Unsupported content type: ${part.type}`);
       return "";
     })
     .filter(Boolean)
@@ -100,21 +115,22 @@ function convertResponsesInputToChat(body) {
     }
 
     if (item.type === "function_call") {
-      messages.push({
+      const previous = messages[messages.length - 1];
+      const call = {
+        id: item.call_id || item.id || id("call"),
+        type: "function",
+        function: { name: item.name, arguments: item.arguments || "{}" },
+      };
+      if (previous?.role === "assistant" && previous.tool_calls) {
+        previous.tool_calls.push(call);
+      } else messages.push({
         role: "assistant",
         content: null,
-        tool_calls: [
-          {
-            id: item.call_id || item.id || id("call"),
-            type: "function",
-            function: {
-              name: item.name,
-              arguments: item.arguments || "{}",
-            },
-          },
-        ],
+        tool_calls: [call],
       });
+      continue;
     }
+    if (item.type !== "reasoning") throw clientError(`Unsupported input type: ${item.type}. Try the responses transport.`);
   }
 
   if (systemParts.length > 0) {
@@ -129,6 +145,9 @@ function convertResponsesInputToChat(body) {
 
 function convertTools(tools) {
   if (!Array.isArray(tools)) return undefined;
+  if (tools.some(tool => tool?.type !== "function" || !tool.name)) {
+    throw clientError(`Unsupported tools: ${tools.filter(tool => tool?.type !== "function" || !tool.name).map(tool => `${tool?.type}:${tool?.name}`).join(", ")}. Use LMSTUDIO_CODEX_TRANSPORT=responses for custom tools.`);
+  }
 
   const converted = tools
     .filter((tool) => tool && tool.type === "function" && tool.name)
@@ -146,26 +165,22 @@ function convertTools(tools) {
 
 async function readRequestBody(req) {
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let size = 0;
+  for await (const chunk of req.iterator({ destroyOnReturn: false })) {
+    size += chunk.length;
+    if (size > MAX_BODY_BYTES) { req.resume(); throw clientError("Request exceeds 16 MiB.", 413); }
+    chunks.push(chunk);
+  }
   if (chunks.length === 0) return {};
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  try {
+    const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error();
+    return body;
+  } catch { throw clientError("Expected a JSON object."); }
 }
 
-async function loadedModel() {
-  if (FIXED_MODEL) return FIXED_MODEL;
-
-  if (MODEL_STATE_FILE && fs.existsSync(MODEL_STATE_FILE)) {
-    try {
-      const state = JSON.parse(fs.readFileSync(MODEL_STATE_FILE, "utf8"));
-      if (state && typeof state.id === "string" && state.id.length > 0) {
-        return state.id;
-      }
-    } catch {
-      // Fall through to LM Studio introspection.
-    }
-  }
-
-  const response = await fetch(`${LMSTUDIO_BASE_URL}/api/v1/models`);
+async function loadedModel(details = false) {
+  const response = await fetch(`${LMSTUDIO_BASE_URL}/api/v1/models`, { signal: AbortSignal.timeout(5000) });
   if (!response.ok) {
     throw new Error(`LM Studio model list failed with HTTP ${response.status}`);
   }
@@ -175,7 +190,7 @@ async function loadedModel() {
   for (const model of data.models || []) {
     if (model.type !== "llm") continue;
     for (const instance of model.loaded_instances || []) {
-      loaded.push(instance.id || model.key);
+      loaded.push({ id: instance.id || model.key, contextLength: instance.config?.context_length });
     }
   }
 
@@ -185,11 +200,11 @@ async function loadedModel() {
 
   if (loaded.length > 1) {
     throw new Error(
-      `Multiple LLMs are loaded in LM Studio (${loaded.join(", ")}). Unload all but one model, then run lm-studio again.`
+      `Multiple LLMs are loaded in LM Studio (${loaded.map(model => model.id).join(", ")}). Unload all but one model, then run lm-studio again.`
     );
   }
 
-  return loaded[0];
+  return details ? loaded[0] : loaded[0].id;
 }
 
 async function modelList() {
@@ -213,8 +228,23 @@ async function modelList() {
 
 async function handleResponses(req, res) {
   const body = await readRequestBody(req);
-  const model = body.model && body.model !== "lmstudio-loaded" ? body.model : await loadedModel();
+  const model = await loadedModel();
+  if (body.model && body.model !== "lmstudio-loaded" && body.model !== model) {
+    throw clientError(`Requested model is no longer loaded. Current model: ${model}. Use lmstudio-loaded.`);
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(new Error("LM Studio request timed out.")), REQUEST_TIMEOUT_MS);
+  const abort = () => { if (!res.writableEnded) controller.abort(new Error("Client disconnected.")); };
+  res.on("close", abort);
+  const started = Date.now();
+  console.log(JSON.stringify({ event: "request.started", model, transport: TRANSPORT }));
+  try {
+    if (TRANSPORT === "responses") {
+      return await forwardResponses(body, model, res, controller.signal);
+    }
+    if (body.previous_response_id) throw clientError("Chat transport requires full input history, not previous_response_id.");
   const responseId = id("resp");
+  res.responseId = responseId;
   const created = Math.floor(Date.now() / 1000);
   const output = [];
   const stream = body.stream !== false;
@@ -225,11 +255,21 @@ async function handleResponses(req, res) {
     model,
     messages,
     stream: true,
+    stream_options: { include_usage: true },
   };
 
   if (tools) {
     chatBody.tools = tools;
-    chatBody.tool_choice = "auto";
+    chatBody.tool_choice = typeof body.tool_choice === "object"
+      ? { type: "function", function: { name: body.tool_choice.name } }
+      : body.tool_choice || "auto";
+    if (typeof body.parallel_tool_calls === "boolean") chatBody.parallel_tool_calls = body.parallel_tool_calls;
+  }
+  if (body.text?.format && body.text.format.type !== "text") {
+    const format = body.text.format;
+    chatBody.response_format = format.type === "json_schema"
+      ? { type: "json_schema", json_schema: { name: format.name, schema: format.schema, strict: format.strict } }
+      : format;
   }
 
   if (typeof body.temperature === "number") chatBody.temperature = body.temperature;
@@ -239,16 +279,17 @@ async function handleResponses(req, res) {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(chatBody),
+    signal: controller.signal,
   });
 
   if (!upstream.ok || !upstream.body) {
     const detail = await upstream.text().catch(() => "");
-    throw new Error(`LM Studio chat completion failed with HTTP ${upstream.status}: ${detail}`);
+    throw clientError(`LM Studio chat completion failed with HTTP ${upstream.status}: ${detail}`, upstream.status >= 400 ? upstream.status : 502);
   }
 
   if (!stream) {
     const completion = await collectChatStream(upstream);
-    return json(res, 200, completeResponse(responseId, created, model, completion.output));
+    return json(res, 200, completeResponse(responseId, created, model, completion.output, completion.usage));
   }
 
   sseHeaders(res);
@@ -274,16 +315,45 @@ async function handleResponses(req, res) {
     toolCalls: new Map(),
   };
 
-  await streamChatAsResponses(upstream, res, state);
+  await streamChatAsResponses(upstream, res, state, controller.signal);
 
   sse(res, "response.completed", {
     type: "response.completed",
-    response: completeResponse(responseId, created, model, output),
+    response: completeResponse(responseId, created, model, output, state.usage),
   });
+  res.end();
+  } finally {
+    clearTimeout(timeout);
+    res.off("close", abort);
+    controller.abort();
+    console.log(JSON.stringify({ event: "request.finished", model, durationMs: Date.now() - started }));
+  }
+}
+
+async function forwardResponses(body, model, res, signal) {
+  const upstream = await fetch(`${LMSTUDIO_BASE_URL}/v1/responses`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...body, model, stream: body.stream !== false }), signal,
+  });
+  if (!upstream.ok) throw clientError(`LM Studio Responses HTTP ${upstream.status}: ${await upstream.text()}`, upstream.status);
+  if (body.stream === false) {
+    const result = await upstream.json();
+    if (!["completed", "incomplete"].includes(result.status)) throw new Error(`LM Studio returned status ${result.status}`);
+    return json(res, 200, result);
+  }
+  sseHeaders(res);
+  let terminal = false;
+  for await (const event of parseSse(upstream.body, false)) {
+    if (!event.type) throw new Error("Responses stream event is missing type.");
+    sse(res, event.type, event);
+    if (["response.completed", "response.failed", "response.incomplete"].includes(event.type)) terminal = true;
+    if (res.writableNeedDrain) await once(res, "drain", { signal });
+  }
+  if (!terminal) throw new Error("LM Studio stream ended before a terminal Responses event.");
   res.end();
 }
 
-function completeResponse(responseId, created, model, output) {
+function completeResponse(responseId, created, model, output, usage) {
   return {
     id: responseId,
     object: "response",
@@ -291,7 +361,7 @@ function completeResponse(responseId, created, model, output) {
     status: "completed",
     model,
     output,
-    usage: null,
+    usage: usage || null,
   };
 }
 
@@ -302,26 +372,27 @@ async function collectChatStream(upstream) {
     applyChatChunk(chunk, null, state);
   }
   finalizeState(null, state);
-  return { output };
+  return { output, usage: state.usage };
 }
 
-async function streamChatAsResponses(upstream, res, state) {
+async function streamChatAsResponses(upstream, res, state, signal) {
   for await (const chunk of parseSse(upstream.body)) {
     applyChatChunk(chunk, res, state);
+    if (res.writableNeedDrain) await once(res, "drain", { signal });
   }
   finalizeState(res, state);
 }
 
-async function* parseSse(stream) {
+async function* parseSse(stream, requireDone = true) {
   const decoder = new TextDecoder();
   let buffer = "";
 
   for await (const chunk of stream) {
     buffer += decoder.decode(chunk, { stream: true });
     let boundary;
-    while ((boundary = buffer.indexOf("\n\n")) !== -1) {
-      const frame = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
+    while ((boundary = /\r?\n\r?\n/.exec(buffer))) {
+      const frame = buffer.slice(0, boundary.index);
+      buffer = buffer.slice(boundary.index + boundary[0].length);
       const dataLines = frame
         .split(/\r?\n/)
         .filter((line) => line.startsWith("data:"))
@@ -329,13 +400,15 @@ async function* parseSse(stream) {
       if (dataLines.length === 0) continue;
       const data = dataLines.join("\n");
       if (data === "[DONE]") return;
-      try {
-        yield JSON.parse(data);
-      } catch {
-        // Ignore malformed upstream frames.
-      }
+      let parsed;
+      try { parsed = JSON.parse(data); }
+      catch { throw new Error("Malformed JSON in LM Studio stream."); }
+      if (parsed.error) throw new Error(`LM Studio stream error: ${JSON.stringify(parsed.error)}`);
+      yield parsed;
     }
+    if (buffer.length > MAX_BODY_BYTES) throw new Error("LM Studio stream frame exceeds 16 MiB.");
   }
+  if (requireDone || buffer.trim()) throw new Error("LM Studio stream closed before completion.");
 }
 
 function ensureMessage(res, state) {
@@ -378,7 +451,7 @@ function ensureToolCall(res, state, index, delta) {
     type: "function_call",
     status: "in_progress",
     call_id: delta.id || id("call"),
-    name: delta.function?.name || "",
+    name: "",
     arguments: "",
   };
   state.toolCalls.set(index, item);
@@ -396,8 +469,16 @@ function ensureToolCall(res, state, index, delta) {
 }
 
 function applyChatChunk(chunk, res, state) {
+  if (chunk.usage) state.usage = {
+    input_tokens: chunk.usage.prompt_tokens || 0,
+    output_tokens: chunk.usage.completion_tokens || 0,
+    total_tokens: chunk.usage.total_tokens || 0,
+    input_tokens_details: { cached_tokens: chunk.usage.prompt_tokens_details?.cached_tokens || 0 },
+    output_tokens_details: { reasoning_tokens: chunk.usage.completion_tokens_details?.reasoning_tokens || 0 },
+  };
   const choice = chunk.choices && chunk.choices[0];
   if (!choice) return;
+  if (choice.finish_reason) state.finishReason = choice.finish_reason;
 
   const delta = choice.delta || {};
 
@@ -420,14 +501,9 @@ function applyChatChunk(chunk, res, state) {
   for (const toolDelta of delta.tool_calls || []) {
     const index = toolDelta.index ?? 0;
     const item = ensureToolCall(res, state, index, toolDelta);
-    if (toolDelta.id && !item.call_id) item.call_id = toolDelta.id;
+    if (toolDelta.id) item.call_id = toolDelta.id;
     if (toolDelta.function?.name) {
-      const nameDelta = toolDelta.function.name;
-      if (!item.name || nameDelta.startsWith(item.name)) {
-        item.name = nameDelta;
-      } else if (!item.name.endsWith(nameDelta)) {
-        item.name += nameDelta;
-      }
+      item.name += toolDelta.function.name;
     }
     if (toolDelta.function?.arguments) {
       item.arguments += toolDelta.function.arguments;
@@ -444,6 +520,15 @@ function applyChatChunk(chunk, res, state) {
 }
 
 function finalizeState(res, state) {
+  if (!state.finishReason) throw new Error("LM Studio returned no finish_reason.");
+  if (!["stop", "tool_calls", "function_call"].includes(state.finishReason)) {
+    throw new Error(`LM Studio response incomplete (${state.finishReason}). Increase output/context limits or inspect model settings.`);
+  }
+  if (!state.message && state.toolCalls.size === 0) throw new Error("LM Studio returned no text or tool calls. Check reasoning/output limits and model template.");
+  for (const item of state.toolCalls.values()) {
+    if (!item.name) throw new Error("LM Studio returned an unnamed tool call.");
+    try { JSON.parse(item.arguments); } catch { throw new Error(`Invalid tool arguments for ${item.name}.`); }
+  }
   if (state.message) {
     const item = state.message;
     const outputIndex = state.output.indexOf(item);
@@ -495,6 +580,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
 
+    if (req.headers.origin) throw clientError("Browser-origin requests are not supported.", 403);
     if (req.method === "GET" && url.pathname === "/health") {
       return json(res, 200, {
         ok: true,
@@ -502,8 +588,16 @@ const server = http.createServer(async (req, res) => {
         port: PORT,
         baseUrl: LMSTUDIO_BASE_URL,
         stateFile: MODEL_STATE_FILE,
-        model: await loadedModel(),
+        revision: REVISION,
+        pid: process.pid,
+        script: __filename,
+        transport: TRANSPORT,
+        timeoutMs: REQUEST_TIMEOUT_MS,
       });
+    }
+    if (req.method === "GET" && url.pathname === "/ready") {
+      const model = await loadedModel(true);
+      return json(res, 200, { model: model.id, contextLength: model.contextLength, transport: TRANSPORT });
     }
 
     if (req.method === "GET" && url.pathname === "/v1/models") {
@@ -519,12 +613,23 @@ const server = http.createServer(async (req, res) => {
     const message = error && error.stack ? error.stack : String(error);
     console.error(message);
     if (!res.headersSent) {
-      return json(res, 500, { error: { message } });
+      return json(res, error.status || 502, { error: { message: error.message || String(error) } });
     }
+    if (!res.destroyed) sse(res, "response.failed", {
+      type: "response.failed",
+      response: { id: res.responseId || id("resp"), object: "response", status: "failed", output: [], error: { code: "upstream_error", message: error.message || String(error) } },
+    });
     res.end();
   }
 });
 
-server.listen(PORT, "127.0.0.1", () => {
+if (require.main === module) {
+  server.on("error", error => {
+    console.error(`Gateway could not listen on 127.0.0.1:${PORT}: ${error.code || error.message}. Check for another service or run lm-studio-stop for this installation.`);
+    process.exitCode = 1;
+  });
+  server.listen(PORT, "127.0.0.1", () => {
   console.log(`LM Studio Responses gateway listening on http://127.0.0.1:${PORT}`);
-});
+  });
+}
+module.exports = { server, parseSse, convertResponsesInputToChat, convertTools };

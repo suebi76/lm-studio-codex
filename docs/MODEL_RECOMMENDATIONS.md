@@ -1,52 +1,13 @@
-# Model Recommendations
+# Choosing a Model
 
-Local Coding-Agent workflows need more than good chat quality. Prefer models that are strong at:
+Use a chat/instruct model with documented tool-calling support. A coding-oriented model is a reasonable starting point, but a family name, a large parameter count or a community filename does not establish compatibility. Quantization, chat templates, LM Studio runtimes and loaded context all affect results.
 
-- instruction following
-- repository-scale code understanding
-- JSON output
-- tool/function calling
-- long context
-- stable behavior across multi-step tasks
+After loading one model, run `lm-studio-doctor`. It checks streamed output, JSON, a tool call and its result, then a real Codex answer. Treat a failed tool round trip as a failed agent setup, even when ordinary chat looks good.
 
-Run this after loading a model in LM Studio:
+Begin with a small read-only project task, then a bounded edit with a test. Review the diff. Passing Doctor is evidence of basic capability, not a guarantee for autonomous repository work.
 
-```bash
-lm-studio-doctor
-```
+Choose a context size that fits your hardware and leaves room for Codex instructions, tools, source files and outputs. An 8192-token context can be too small for substantial agent work; arbitrarily maximizing it can exhaust memory. The launcher uses the loaded context size when LM Studio exposes it.
 
-The Doctor checks the real loaded model through the same gateway Codex uses. Trust that result more than the model family name.
+To compare models fairly, use the same small project task and record correctness, time to first output, total time, tool failures and memory use. No model is hardcoded by this project.
 
-## Recommended Families
-
-These are good starting points for LM Studio + Codex CLI:
-
-- Qwen Coder / large Qwen instruct models: usually the best first choice for local coding-agent work.
-- DeepSeek Coder / DeepSeek V3 or newer coding-capable variants: strong for larger code tasks if your hardware can run them comfortably.
-- Kimi K2 / Kimi Code style models: good candidates for agentic workflows and tool-heavy sessions.
-- Devstral: designed for multi-step coding-agent tasks.
-- Codestral: good for code generation and editing; use Doctor results to judge longer agent sessions.
-
-## Usable With Caution
-
-- Gemma instruct models can work for small coding tasks, but check JSON and tool-call reliability before long autonomous runs.
-- General Llama, Mistral, Phi, Granite, and StarCoder variants depend heavily on size, quantization, and instruct tuning. Prefer coder/instruct variants.
-- Very small models can be useful for quick edits, but often struggle with long context and tool-call discipline.
-
-## Practical Rule
-
-For this project, load exactly one model in LM Studio, then run:
-
-```bash
-lm-studio-doctor
-```
-
-Green text, JSON, tool-call, and Codex smoke checks mean the model is a good candidate. Warnings mean it may still be useful, but keep tasks smaller and review changes carefully.
-
-To switch models:
-
-1. Stop the current Codex run.
-2. Unload the old model in LM Studio.
-3. Load the new model.
-4. Run `lm-studio-doctor`.
-5. Run `lm-studio`.
+To switch, wait for the current task to end, unload the old model and load the new one. The next request follows the loaded model without restarting the terminal. Use `:new` if the replacement cannot fit the previous session's history.

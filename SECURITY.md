@@ -14,4 +14,6 @@ Please open a GitHub issue for security concerns that do not expose private data
 
 ## Local Model Caveat
 
-Local models vary in tool-use quality. Review code changes before applying or committing them, especially when using small, uncensored, or experimental models.
+Local models vary in tool-use quality. The default loop uses workspace-write sandboxing with no approval prompts; commands requiring escalation fail. Review changes before committing them.
+
+The gateway rejects browser-origin requests and listens only on loopback, but other local processes can still access it. Do not expose it to a network. Session history and logs can contain private project information and must not be published.

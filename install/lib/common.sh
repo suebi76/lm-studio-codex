@@ -124,23 +124,14 @@ get_state_file_absolute_path() {
 }
 
 stop_gateway_on_port() {
-  if [ -f "$LOG_DIR/gateway.pid" ]; then
-    local pid
-    pid="$(head -n 1 "$LOG_DIR/gateway.pid" 2>/dev/null || true)"
-    if [ -n "$pid" ]; then
+  local pid command_line
+  while read -r pid command_line; do
+    if [ "$command_line" = "node $INSTALL_ROOT/lib/lmstudio-responses-gateway.js" ]; then
       kill "$pid" >/dev/null 2>&1 || true
     fi
-    rm -f "$LOG_DIR/gateway.pid"
-  fi
+  done < <(ps -axo pid=,args=)
+  rm -f "$LOG_DIR/gateway.pid"
 
-  if command_available lsof; then
-    local pids
-    pids="$(lsof -ti tcp:18123 2>/dev/null || true)"
-    if [ -n "$pids" ]; then
-      # shellcheck disable=SC2086
-      kill $pids >/dev/null 2>&1 || true
-    fi
-  fi
 }
 
 missing_dependency_names() {
@@ -176,6 +167,10 @@ assert_dependencies() {
     [ -n "$found" ] && missing+=("$found")
   done < <(missing_dependency_names)
   if [ "${#missing[@]}" -eq 0 ]; then
+    node -e 'if(Number(process.versions.node.split(".")[0]) < 22) process.exit(1)' || {
+      stop_with_help "Node.js 22 or newer is required." "Install Node.js LTS from https://nodejs.org"
+      return 1
+    }
     write_ok "Required commands found: node, codex, lms"
     return 0
   fi
@@ -194,7 +189,7 @@ assert_dependencies() {
 ensure_lmstudio_server() {
   if ! test_http_ok "$LMSTUDIO_BASE_URL/v1/models"; then
     write_info "LM Studio server is not responding on $LMSTUDIO_BASE_URL. Starting it with lms..."
-    lms server start || true
+    node "$COMMON_DIR/run-lms.js" server start || return 1
 
     local ready=0
     local i
@@ -220,7 +215,7 @@ ensure_lmstudio_server() {
 
 get_loaded_lmstudio_models_tsv() {
   local loaded_json
-  if ! loaded_json="$(lms ps --json 2>/dev/null)"; then
+  if ! loaded_json="$(node "$COMMON_DIR/run-lms.js" ps --json)"; then
     stop_with_help "Could not run 'lms ps --json'." \
       "Open LM Studio and make sure the lms CLI is enabled." \
       "Try running 'lms ps --json' manually in a new terminal."
@@ -247,7 +242,8 @@ process.stdin.on("end", () => {
         model.identifier,
         model.displayName,
         model.modelKey,
-        model.architecture
+        model.architecture,
+        model.contextLength
       ].map(value => String(value ?? "").replace(/[\t\r\n]/g, " "));
       console.log(fields.join("\t"));
     }
@@ -316,6 +312,7 @@ select_lmstudio_model() {
   if [ "$count" = "1" ]; then
     save_selected_model_from_tsv "$loaded_tsv"
     SELECTED_MODEL_ID="$(printf '%s' "$loaded_tsv" | awk -F '\t' '{print $1}')"
+    SELECTED_MODEL_CONTEXT="$(printf '%s' "$loaded_tsv" | awk -F '\t' '{print $5}')"
     write_ok "Selected the only loaded model: $SELECTED_MODEL_ID"
     return 0
   fi
@@ -332,16 +329,34 @@ ensure_gateway() {
   expected_state_file="$(get_state_file_absolute_path)"
 
   if [ -n "$health_gateway" ] && { [ "$health_gateway" != "lm-studio-codex-gateway" ] || [ "$health_state_file" != "$expected_state_file" ]; }; then
-    write_warn "Another process is using the Codex LM Studio gateway port. Restarting it..."
+    stop_with_help "Port 18123 belongs to another service or installation." "Stop it from its owning installation. No foreign process was stopped."
+    return 1
+  fi
+
+  local revision health_revision health_base health_transport health_timeout
+  revision="$(node -e 'const fs=require("fs"),c=require("crypto"); console.log(c.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex"))' "$INSTALL_ROOT/lib/lmstudio-responses-gateway.js")"
+  health_revision="$(get_gateway_health_field revision 2>/dev/null || true)"
+  health_base="$(get_gateway_health_field baseUrl 2>/dev/null || true)"
+  health_transport="$(get_gateway_health_field transport 2>/dev/null || true)"
+  health_timeout="$(get_gateway_health_field timeoutMs 2>/dev/null || true)"
+  if [ -n "$health_gateway" ] && { [ "$health_revision" != "$revision" ] || [ "$health_base" != "$LMSTUDIO_BASE_URL" ] || [ "$health_transport" != "${LMSTUDIO_CODEX_TRANSPORT:-chat}" ] || [ "$health_timeout" != "${LMSTUDIO_CODEX_TIMEOUT_MS:-600000}" ]; }; then
+    write_info "Restarting this installation's gateway after a code/configuration change..."
     stop_gateway_on_port
     sleep 0.5
     health_gateway="$(get_gateway_health_field gateway 2>/dev/null || true)"
+    if [ -n "$health_gateway" ]; then
+      stop_with_help "The previous gateway did not stop." "Run lm-studio-stop, inspect its message, then retry."
+      return 1
+    fi
   fi
 
   if [ -n "$health_gateway" ]; then
     write_ok "Gateway is already running on port 18123"
     return 0
   fi
+
+  # Recover an owned older gateway whose health check depends on a loaded model.
+  stop_gateway_on_port
 
   local gateway_script="$INSTALL_ROOT/lib/lmstudio-responses-gateway.js"
   local stdout_log="$LOG_DIR/gateway.out.log"
@@ -350,15 +365,17 @@ ensure_gateway() {
 
   write_info "Starting local Codex <-> LM Studio gateway on http://127.0.0.1:18123..."
   LMSTUDIO_BASE_URL="$LMSTUDIO_BASE_URL" \
+  LMSTUDIO_CODEX_GATEWAY_PORT=18123 \
   LMSTUDIO_CODEX_MODEL_STATE_FILE="$MODEL_STATE_FILE" \
-    node "$gateway_script" >"$stdout_log" 2>"$stderr_log" &
+    nohup node "$gateway_script" >"$stdout_log" 2>"$stderr_log" </dev/null &
+  local gateway_pid=$!
   printf '%s\n' "$!" > "$pid_file"
 
   local ready=0
   local i
   for i in $(seq 1 30); do
     sleep 0.3
-    if test_http_ok "$GATEWAY_URL"; then
+    if [ "$(get_gateway_health_field pid 2>/dev/null || true)" = "$gateway_pid" ] && [ "$(get_gateway_health_field revision 2>/dev/null || true)" = "$revision" ]; then
       ready=1
       break
     fi

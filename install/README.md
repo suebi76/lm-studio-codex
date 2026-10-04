@@ -1,223 +1,29 @@
-# LM Studio Codex CLI
+# Portable Install Folder
 
-This folder contains a portable setup for running Codex CLI against the model currently loaded in LM Studio.
+Keep this folder at a stable path. It contains everything specific to this project; dependencies are installed separately.
 
-## Requirements
+Requirements: Windows/macOS/Linux, Node.js 22+, official Codex CLI, LM Studio with lms CLI and OpenAI-compatible server endpoints, and exactly one loaded chat/instruct model.
 
-- Windows, macOS, or Linux
-- LM Studio with the `lms` CLI enabled
-- Codex CLI installed and available as `codex`
-- Node.js available as `node`
+## Windows
 
-## Install
+Run `install.bat`, or `powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1` from this folder. Add `-InstallMissing` to try installing Node.js LTS and Codex. Missing dependencies return a failure code with repair instructions. The batch file pauses intentionally at the end so its result remains readable.
 
-Windows PowerShell:
+## macOS/Linux
 
-```powershell
-.\install\install.ps1
-```
-
-Or double-click:
-
-```text
-install\install.bat
-```
-
-The installer prints every relevant step. If Node.js or Codex CLI is missing, you can ask it to try installing those:
-
-```powershell
-.\install\install.ps1 -InstallMissing
-```
-
-macOS/Linux:
-
-```bash
-./install/install.sh
-```
-
-If Node.js or Codex CLI is missing, the installer can try to install what it can:
-
-```bash
-./install/install.sh --install-missing
-```
-
-LM Studio still needs to be installed and opened by the user, because models and the `lms` CLI are managed by LM Studio itself.
-
-Then open a new VS Code terminal.
-
-## Uninstall
-
-Windows:
-
-```powershell
-.\install\uninstall.ps1
-```
-
-macOS/Linux:
-
-```bash
-./install/uninstall.sh
-```
+Run `bash install.sh`. Add `--install-missing` to try available package installation methods. Enable lms in LM Studio itself. Reopen the terminal after installation; restart VS Code if it still inherits an old PATH.
 
 ## Use
 
-In any project folder:
+In a project directory run `lm-studio`. Enter a task; follow-up tasks resume the same session. `:new` starts fresh; `:exit` exits. Run `lm-studio-doctor` after loading a new model.
 
-```powershell
-lm-studio
-```
+Change models between tasks. The next request automatically uses the single loaded model. A smaller model context may require a fresh session.
 
-This starts Codex CLI in the current folder and routes model requests through LM Studio.
+`lm-studio --help` works without starting the server. `lm-studio --tui` opens the native CLI interface.
 
-`lm-studio` uses a short OS-local Codex runtime path. This avoids app-server socket and plugin-cache path errors in portable folders, especially under long OneDrive paths on Windows.
+## State and Uninstall
 
-Default Codex runtime paths:
+Runtime logs and selection state stay in this folder's `logs/` and `state/` directories. Codex history is separate: Windows `%LOCALAPPDATA%\\lmsc\\c`, macOS `~/.lmsc/c`, Linux `~/.local/state/lmsc/c` (or XDG_STATE_HOME). Override with `LMSTUDIO_CODEX_HOME`. Do not publish runtime files.
 
-- Windows: `%LOCALAPPDATA%\lmsc\c`
-- macOS: `~/.lmsc/c`
-- Linux: `$XDG_STATE_HOME/lmsc/c` or `~/.local/state/lmsc/c`
+Run `uninstall.ps1` or `bash uninstall.sh` to remove this installation's global commands. Conversation history is preserved. Reinstall after moving the folder.
 
-To override the Codex runtime path:
-
-```powershell
-$env:LMSTUDIO_CODEX_HOME = "C:\lmsc\c"
-```
-
-On macOS/Linux:
-
-```bash
-export LMSTUDIO_CODEX_HOME="$HOME/.lmsc/c"
-```
-
-To force no-daemon mode for troubleshooting, set:
-
-```powershell
-$env:LMSTUDIO_CODEX_NO_DAEMON = "1"
-```
-
-On macOS/Linux:
-
-```bash
-export LMSTUDIO_CODEX_NO_DAEMON=1
-```
-
-Before using a new model for longer agent work, run:
-
-```powershell
-lm-studio-doctor
-```
-
-## Loaded model
-
-Load exactly one chat/instruct LLM in LM Studio. `lm-studio` automatically uses that loaded model.
-
-To show the currently loaded model:
-
-```powershell
-lm-studio-model -List
-```
-
-On macOS/Linux:
-
-```bash
-lm-studio-model --list
-```
-
-If more than one LLM is loaded, the command stops and asks you to unload all but one model in LM Studio. This keeps the gateway predictable.
-
-## Change model
-
-To change models:
-
-1. Stop or finish the current Codex run.
-2. In LM Studio, unload the old model.
-3. Load the new model.
-4. Run `lm-studio` again.
-
-## Status and stop
-
-```powershell
-lm-studio-status
-lm-studio-stop
-lm-studio-doctor
-```
-
-`lm-studio-status` shows:
-
-- install root
-- Codex home used by this setup
-- missing dependencies
-- loaded model selected for Codex
-- gateway status and active model
-
-`lm-studio-doctor` checks the same setup plus model behavior for text output, JSON output, tool-call output, and a small Codex CLI smoke test.
-
-Doctor gateway checks time out after 45 seconds by default. For slow models:
-
-```powershell
-$env:LMSTUDIO_DOCTOR_TIMEOUT_SEC = "90"
-lm-studio-doctor
-```
-
-## What the commands check
-
-Every start checks:
-
-- `node` is available
-- `codex` is available
-- `lms` is available
-- LM Studio server responds on `http://127.0.0.1:1234`
-- at least one LLM is loaded in LM Studio
-- no more than one LLM is loaded in LM Studio
-- the local gateway on port `18123` is running and belongs to this install
-
-If any check fails, the command prints a concrete fix instead of failing silently.
-
-## Typical fixes
-
-If `node` is missing:
-
-```powershell
-winget install OpenJS.NodeJS.LTS
-```
-
-On macOS with Homebrew:
-
-```bash
-brew install node
-```
-
-On Linux, use your distro package manager, for example:
-
-```bash
-sudo apt install nodejs npm
-```
-
-If `codex` is missing after Node.js is installed:
-
-```bash
-npm install -g @openai/codex
-```
-
-If `lms` is missing, install/open LM Studio and enable the LM Studio CLI from LM Studio's developer tools.
-
-If no model is loaded, open LM Studio and load a chat/instruct model before running `lm-studio`.
-
-## Optional desktop app experiment
-
-```powershell
-lm-studio-app
-```
-
-The CLI path is the reliable path. The desktop app command starts the same gateway and opens the ChatGPT/Codex desktop app for testing.
-
-## Runtime state
-
-The installer stores runtime state under:
-
-```text
-install/state/
-install/logs/
-```
-
-These folders should not be committed. The Codex runtime cache is stored in the short OS-local path shown above.
+See the repository's [commands](../docs/COMMANDS.md), [architecture](../docs/ARCHITECTURE.md), and [troubleshooting](../docs/TROUBLESHOOTING.md) for all settings.

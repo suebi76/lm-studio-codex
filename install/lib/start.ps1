@@ -1,41 +1,35 @@
 param(
     [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]] $CodexArgs
+    [string[]] $CodexArgs = @()
 )
-
 $ErrorActionPreference = "Stop"
-if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+if (Get-Variable PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
     $PSNativeCommandUseErrorActionPreference = $false
 }
-
 . (Join-Path $PSScriptRoot "common.ps1")
-
 try {
+    if ($env:LMSTUDIO_CODEX_ARGS_JSON) {
+        $CodexArgs = @($env:LMSTUDIO_CODEX_ARGS_JSON | ConvertFrom-Json)
+        Remove-Item Env:LMSTUDIO_CODEX_ARGS_JSON
+    }
+    if ($CodexArgs.Count -eq 1 -and $CodexArgs[0] -in @("--help", "-h", "help")) {
+        & node (Join-Path $PSScriptRoot "run-codex.js") --help
+        exit $LASTEXITCODE
+    }
     Write-Info "Starting LM Studio Codex CLI setup..."
     Initialize-LmStudioCodexState
     Assert-Dependencies
     Ensure-LmStudioServer
     $selectedModel = Select-LmStudioModel
     Ensure-Gateway $selectedModel
-
     $env:CODEX_HOME = $script:CodexHome
+    $env:LMSTUDIO_CODEX_CONTEXT = [string] $selectedModel.contextLength
     Write-Ok "Using LM Studio model: $($selectedModel.identifier)"
-    Write-Info "Starting Codex in: $(Get-Location)"
-
-    $finalArgs = @()
-    if ($env:LMSTUDIO_CODEX_NO_DAEMON -eq "1") {
-        $finalArgs += "--no-daemon"
-        Write-Warn "Running Codex with --no-daemon because LMSTUDIO_CODEX_NO_DAEMON=1 is set."
-    } else {
-        Write-Info "Running Codex with the standard interactive daemon. CODEX_HOME is short: $script:CodexHome"
-    }
-    $finalArgs += $CodexArgs
-
-    & codex @finalArgs
+    Write-Info "Working directory: $(Get-Location)"
+    $env:LMSTUDIO_CODEX_ARGS_JSON = ConvertTo-Json -InputObject @($CodexArgs) -Compress
+    & node (Join-Path $PSScriptRoot "run-codex.js")
     exit $LASTEXITCODE
 } catch {
-    Write-Host ""
-    Write-Host "[lm-studio] Startup failed." -ForegroundColor Red
-    Write-Host "[lm-studio] Run 'lm-studio-status' for diagnostics after fixing the issue."
+    Write-Host "[lm-studio] Startup failed: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }

@@ -1,195 +1,59 @@
 # Troubleshooting
 
-## `lm-studio` is not recognized
+Start with `lm-studio-status`, then `lm-studio-doctor`. Gateway logs are in `install/logs/gateway.out.log` and `gateway.err.log`.
 
-Open a new terminal after running the installer. VS Code terminals keep the old `PATH` until reopened.
+## No Global Command
 
-Run the installer again if needed:
+Run the installer again. Restart VS Code completely if a new terminal still inherits the old PATH. Keep the installed folder at its original location, or rerun installation after moving it. Unix installs use `~/.local/bin`; symlinks now resolve the actual installation path.
 
-```powershell
-.\install\install.ps1
-```
+## Missing Dependencies
 
-On macOS/Linux:
+Use Node.js 22 or newer, the official Codex CLI, and LM Studio with its lms CLI enabled. Install Codex with `npm install -g @openai/codex`. Open LM Studio once and follow its CLI setup instructions. Check `node --version`, `codex --version`, and `lms ps --json`.
 
-```bash
-./install/install.sh
-```
+The installer returns a nonzero exit code if required commands remain missing. Optional Node/Codex installation failures remain visible. Some Linux package repositories provide an older Node version; check the installed version rather than assuming it is sufficient.
 
-If the installer added `~/.local/bin` to your shell profile, open a new terminal or run `source ~/.zshrc` / `source ~/.bashrc`.
+## Endpoint Selection
 
-## `node` is missing
+Enable LM Studio's OpenAI-compatible local server. Default chat mode uses `/v1/chat/completions`; native responses mode uses `/v1/responses`. Model discovery also requires the native `/api/v1/models` endpoint. Update LM Studio if that catalog is unavailable. The gateway does not use an OpenAI cloud API key.
 
-Install Node.js LTS:
+If the server is unavailable the helper tries `lms server start`. lms operations time out after 45 seconds with instructions. A custom server URL must match the server where your model is loaded.
 
-```powershell
-winget install OpenJS.NodeJS.LTS
-```
+## No Model or Model Changed
 
-On macOS with Homebrew:
+Load exactly one chat/instruct LLM. The next request discovers it automatically. Change models while no task is generating. After switching to a smaller context window use `:new` if the old history no longer fits. Reloading the model does not fix Codex socket or protocol errors.
 
-```bash
-brew install node
-```
+## Working for Less Than a Second, No Answer
 
-On Linux, use your distro package manager, for example:
+This symptom alone does not identify a model failure. Inspect whether `request.started` appears in gateway logs. If not, Codex has not reached the model. The default exec loop avoids the interactive daemon path and explicitly reports turns without an answer.
 
-```bash
-sudo apt install nodejs npm
-```
+Try `lm-studio "Reply exactly OK"`. The native interface remains available via `lm-studio --tui`.
 
-Then open a new terminal.
+## Socket or Long-Path Errors
 
-## `codex` is missing
+Keep the default short Codex home outside OneDrive. The exec loop does not rely on the interactive daemon. TUI uses `--no-daemon` only when the installed version supports it. The old daemon environment variables are no longer used.
 
-After Node.js is installed:
+## Stream Closed Before Completion
 
-```powershell
-npm install -g @openai/codex
-```
+Current gateway versions report the upstream cause instead of silently closing a partial answer. Check for context overflow, exhausted output tokens, malformed tool arguments, model unloads or timeout messages. Do not repeatedly retry an editing task without checking what already changed.
 
-Then open a new terminal.
+The gateway stops upstream work when its client disconnects. It does not silently replay a partial generation on another transport.
 
-## `lms` is missing
+## System Message Must Be at the Beginning
 
-Install LM Studio, open it once, and enable or install the LM Studio CLI from LM Studio's developer tools.
+Use `LMSTUDIO_CODEX_TRANSPORT=chat`; this mode groups system/developer instructions at the beginning. Native responses mode delegates template handling to LM Studio.
 
-On macOS/Linux, if LM Studio supports it on your install, you can also try:
+## Model Metadata and Context
 
-```bash
-npx lmstudio install-cli
-```
+Codex may warn that a local model has no known metadata. The launcher supplies the loaded context size when exposed by LM Studio, but cannot infer every capability from a model name. An 8192-token context may leave little room after Codex instructions and tool schemas. Increase it only within your hardware budget, or reduce the task/history.
 
-Check:
+## Tool or Image Errors
 
-```powershell
-lms ps --json
-```
+Chat mode supports function tools and text. Use native responses mode for images or custom tools, with a compatible model. Cloud web search, plugins and multi-agent tools are disabled by default. Tool-call or tool-result failures in Doctor mean this model/configuration has not passed the agent workflow test, even if plain chat works.
 
-## LM Studio server is not reachable
+## Port Conflict
 
-The helper tries to start the server with:
+The helper never kills an arbitrary process on port 18123. Stop the other installation/service using its own controls. `lm-studio-stop` verifies this installation's process before stopping it. An updated gateway is restarted when its source revision or settings change.
 
-```powershell
-lms server start
-```
+## Slow Model
 
-If it still fails, open LM Studio and enable the local server. The expected URL is:
-
-```text
-http://127.0.0.1:1234/v1/models
-```
-
-## No model is loaded
-
-Open LM Studio and load one chat/instruct model. Then run:
-
-```powershell
-lm-studio
-```
-
-## More than one model is loaded
-
-Unload all but one LLM in LM Studio. Then run:
-
-```powershell
-lm-studio
-```
-
-## Gateway did not start
-
-Run:
-
-```powershell
-lm-studio-stop
-lm-studio-status
-```
-
-Then retry:
-
-```powershell
-lm-studio
-```
-
-Gateway logs are stored in:
-
-```text
-install/logs/
-```
-
-## `path must be shorter than SUN_LEN`
-
-This is a Codex app-server daemon socket path limit, not an LM Studio model problem. It can happen when the portable install lives under a long folder such as OneDrive.
-
-Current versions of `lm-studio` use a short OS-local Codex runtime path to avoid this.
-
-If you still see this error:
-
-```powershell
-git pull
-lm-studio-stop
-lm-studio
-```
-
-If you installed from a release zip, download the newest release and replace the old folder.
-
-Only force no-daemon mode if you intentionally want it for troubleshooting:
-
-```powershell
-$env:LMSTUDIO_CODEX_NO_DAEMON = "1"
-lm-studio
-```
-
-## Codex plugin sync reports `Filename too long`
-
-This is another path-length symptom from Codex writing internal plugin/cache files under a long `CODEX_HOME`.
-
-Current versions use a short default runtime path:
-
-- Windows: `%LOCALAPPDATA%\lmsc\c`
-- macOS: `~/.lmsc/c`
-- Linux: `$XDG_STATE_HOME/lmsc/c` or `~/.local/state/lmsc/c`
-
-If you still see this on Windows, choose an even shorter path:
-
-```powershell
-$env:LMSTUDIO_CODEX_HOME = "C:\lmsc\c"
-lm-studio
-```
-
-On macOS/Linux:
-
-```bash
-export LMSTUDIO_CODEX_NO_DAEMON=1
-lm-studio
-```
-
-## Qwen reports `System message must be at the beginning`
-
-The direct LM Studio Responses route can trigger this on some Qwen templates. Use `lm-studio` so Codex goes through this project's gateway. The gateway moves system/developer text to the beginning before sending the chat request to LM Studio.
-
-## Codex warnings about unknown model metadata
-
-This is expected for local LM Studio model IDs. Codex uses fallback metadata. The gateway still routes requests to the loaded model.
-
-## `lm-studio-doctor` warns about tool calls
-
-The model can still be useful, but it may be unreliable for longer Coding-Agent workflows. Try a coding/agent model family such as Qwen Coder, DeepSeek Coder/V3-style models, Kimi K2/K-code style models, Devstral, or Codestral.
-
-If a model passes text and JSON but fails tool calls, keep tasks small and review every file change carefully.
-
-## `lm-studio-doctor` times out on the text check
-
-The setup is reachable, but the loaded model did not produce a basic response fast enough for agent work. Try:
-
-- a smaller quantization
-- fewer background LM Studio tasks
-- a coding model that fits your VRAM/RAM more comfortably
-- raising the Doctor timeout for testing:
-
-```powershell
-$env:LMSTUDIO_DOCTOR_TIMEOUT_SEC = "90"
-lm-studio-doctor
-```
-
-If the timeout only happens with one model, the gateway is probably fine and that model/build is not a good fit for responsive Coding-Agent sessions on the current machine.
+Doctor defaults to 120 seconds per check. Increase `LMSTUDIO_DOCTOR_TIMEOUT_SEC` if needed; the gateway's total request limit is controlled separately by `LMSTUDIO_CODEX_TIMEOUT_MS`. A timeout does not by itself prove the model is unsuitable. Check LM Studio's own logs and hardware usage.

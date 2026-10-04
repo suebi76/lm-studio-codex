@@ -1,12 +1,17 @@
 # Changelog
 
-## Unreleased
+## Unreleased - Reliability Review
 
-- Changed `lm-studio` to use Codex's standard interactive daemon again now that the runtime path is short.
-- Added `LMSTUDIO_CODEX_NO_DAEMON=1` as the explicit troubleshooting opt-out.
-- Fixed Windows `lm-studio-doctor` Codex smoke test startup when `codex` resolves to a PowerShell/npm shim.
-- Fixed Windows `lm-studio-doctor` success detection when Codex writes the expected marker but PowerShell reports an empty process exit code.
-- Added Doctor warnings for high LM Studio context length, parallel requests, and non-idle model status.
+- Shared Node.js session launcher with explicit session resumption, visible output/progress, exit codes and empty-answer detection.
+- Discover the live model on each request; retain sessions across model changes and pass loaded context sizes when available.
+- Harden streaming: CRLF and split UTF-8, completion validation, tool arguments, usage, structured errors, cancellation and bounded requests.
+- Preserve parallel tool history, tool choice and JSON output schemas. Reject unsupported capabilities explicitly.
+- Add optional native Responses forwarding. Disable unsupported cloud web search, plugins and multi-agent tools in the local default profile.
+- Separate gateway liveness from model readiness; verify process ownership and restart after code/settings changes without killing foreign port owners.
+- Fix Unix global symlinks, detach gateway lifecycle, protect unrelated installed commands and report incomplete installations with nonzero status.
+- Replace duplicated Doctors with shared streamed checks, a tool-result round trip and final-answer verification through the actual Codex CLI.
+- Require Node.js 22+, bound lms operations, and remove misleading model-family guarantees and desktop-app launch claims.
+- Add protocol/session regression tests and a three-platform CI matrix, plus an opt-in real Codex integration test.
 
 ## v0.3.0 - 2026-10-03
 
