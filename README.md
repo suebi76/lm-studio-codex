@@ -93,6 +93,8 @@ lm-studio "Analysiere dieses Projekt und fasse den aktuellen Stand zusammen"
 
 ## Commands
 
+Web search and page reading are automatically available through Exa MCP in every `lm-studio` session, including after model changes. No LM Studio MCP setting or extra installation is needed. The model runs locally; search queries and requested URLs are sent to Exa. Free access has service limits. See [Internet Access](docs/WEB.md) for privacy, offline mode and troubleshooting.
+
 ```powershell
 lm-studio          # start the stable Codex exec prompt loop through LM Studio
 lm-studio "task"   # run one Codex task through LM Studio
@@ -120,6 +122,7 @@ The default gateway translates Chat Completions for strict model templates. An o
 
 - [Install Guide](install/README.md)
 - [Command Reference](docs/COMMANDS.md)
+- [Internet Access](docs/WEB.md)
 - [Model Recommendations](docs/MODEL_RECOMMENDATIONS.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)

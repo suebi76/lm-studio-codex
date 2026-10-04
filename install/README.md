@@ -20,6 +20,10 @@ Change models between tasks. The next request automatically uses the single load
 
 `lm-studio --help` works without starting the server. `lm-studio --tui` opens the native CLI interface.
 
+## Internet Access
+
+Web search and page reading are enabled automatically through hosted Exa MCP. No additional package or LM Studio setting is required. Internet connectivity is needed unless `LMSTUDIO_CODEX_WEB=0` is set explicitly. Queries and requested URLs leave the machine. See [Internet Access](../docs/WEB.md).
+
 ## State and Uninstall
 
 Runtime logs and selection state stay in this folder's `logs/` and `state/` directories. Codex history is separate: Windows `%LOCALAPPDATA%\\lmsc\\c`, macOS `~/.lmsc/c`, Linux `~/.local/state/lmsc/c` (or XDG_STATE_HOME). Override with `LMSTUDIO_CODEX_HOME`. Do not publish runtime files.

@@ -18,6 +18,10 @@ Set `LMSTUDIO_CODEX_TRANSPORT=responses` to forward requests to LM Studio's nati
 
 Chat mode supports text and function tools, not every Responses feature. Unsupported content is rejected with a concrete error rather than silently removed. Cloud web search, plugins, and multi-agent tools are disabled in the managed local profile. Unsupported capabilities can still vary between Codex releases.
 
+## Web MCP
+
+MCP function namespaces are flattened into stable, collision-checked Chat Completions names and restored in Responses output and history. Codex, not LM Studio, executes the MCP calls. The launcher configures the required `lmstudio_web` remote server with only Exa search and fetch tools, bounded startup/tool timeouts and output limits. Built-in cloud web search remains disabled; this is a separate MCP connection. See [Internet Access](WEB.md).
+
 ## Model Selection
 
 Every inference request queries LM Studio's native `/api/v1/models` catalog and requires exactly one loaded LLM. The cached selection file is diagnostic only. Requests never silently load a model named in stale state. Switch models between tasks; the next request uses the new model. An active generation cannot migrate to a different model.

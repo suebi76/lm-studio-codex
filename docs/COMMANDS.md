@@ -40,6 +40,8 @@ Stop only terminates this installation's verified gateway; LM Studio remains run
 | LMSTUDIO_CODEX_TRANSPORT | chat | chat translation or native responses |
 | LMSTUDIO_CODEX_TIMEOUT_MS | 600000 | Maximum duration of one gateway request |
 | LMSTUDIO_DOCTOR_TIMEOUT_SEC | 300 | Maximum duration of each diagnostic request |
+| LMSTUDIO_CODEX_WEB | 1 | Exa MCP search/page reading; set 0 explicitly for offline work |
+| EXA_API_KEY | Unset | Optional Exa key for your account's access limits; sent as a header |
 
 PowerShell example:
 

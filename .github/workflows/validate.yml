@@ -81,6 +81,8 @@ jobs:
             "install/lib/doctor.ps1",
             "install/lib/doctor.sh",
             "install/lib/lmstudio-responses-gateway.js",
+            "install/lib/web-mcp.js",
+            "install/lib/run-codex.js",
             "install/templates/config.toml"
           )
           foreach ($path in $required) {

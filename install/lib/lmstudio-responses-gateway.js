@@ -119,7 +119,7 @@ function convertResponsesInputToChat(body) {
       const call = {
         id: item.call_id || item.id || id("call"),
         type: "function",
-        function: { name: item.name, arguments: item.arguments || "{}" },
+        function: { name: chatToolName(item.name, item.namespace), arguments: item.arguments || "{}" },
       };
       if (previous?.role === "assistant" && previous.tool_calls) {
         previous.tool_calls.push(call);
@@ -143,23 +143,32 @@ function convertResponsesInputToChat(body) {
   return messages;
 }
 
-function convertTools(tools) {
+function chatToolName(name, namespace) {
+  if (!namespace) return name;
+  const hash = createHash("sha256").update(JSON.stringify([namespace, name])).digest("hex").slice(0, 16);
+  return `ns_${hash}_${name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 44)}`;
+}
+
+function convertTools(tools, toolNames = new Map()) {
   if (!Array.isArray(tools)) return undefined;
-  if (tools.some(tool => tool?.type !== "function" || !tool.name)) {
-    throw clientError(`Unsupported tools: ${tools.filter(tool => tool?.type !== "function" || !tool.name).map(tool => `${tool?.type}:${tool?.name}`).join(", ")}. Use LMSTUDIO_CODEX_TRANSPORT=responses for custom tools.`);
+  const converted = [];
+  function add(tool, namespace) {
+    if (tool?.type !== "function" || typeof tool.name !== "string" || !tool.name) {
+      throw clientError(`Unsupported tool: ${tool?.type}:${tool?.name}. Use LMSTUDIO_CODEX_TRANSPORT=responses for custom tools.`);
+    }
+    const name = chatToolName(tool.name, namespace);
+    if (toolNames.has(name)) throw clientError(`Duplicate tool name: ${name}`);
+    toolNames.set(name, namespace ? { name: tool.name, namespace } : { name: tool.name });
+    converted.push({ type: "function", function: {
+      name, description: tool.description || "",
+      parameters: tool.parameters || { type: "object", properties: {} },
+    } });
   }
-
-  const converted = tools
-    .filter((tool) => tool && tool.type === "function" && tool.name)
-    .map((tool) => ({
-      type: "function",
-      function: {
-        name: tool.name,
-        description: tool.description || "",
-        parameters: tool.parameters || { type: "object", properties: {} },
-      },
-    }));
-
+  for (const tool of tools) {
+    if (tool?.type === "namespace" && typeof tool.name === "string" && tool.name && Array.isArray(tool.tools)) {
+      for (const member of tool.tools) add(member, tool.name);
+    } else add(tool);
+  }
   return converted.length ? converted : undefined;
 }
 
@@ -248,7 +257,8 @@ async function handleResponses(req, res) {
   const created = Math.floor(Date.now() / 1000);
   const output = [];
   const stream = body.stream !== false;
-  const tools = convertTools(body.tools);
+  const toolNames = new Map();
+  const tools = convertTools(body.tools, toolNames);
   const messages = convertResponsesInputToChat(body);
 
   const chatBody = {
@@ -261,7 +271,7 @@ async function handleResponses(req, res) {
   if (tools) {
     chatBody.tools = tools;
     chatBody.tool_choice = typeof body.tool_choice === "object"
-      ? { type: "function", function: { name: body.tool_choice.name } }
+      ? { type: "function", function: { name: chatToolName(body.tool_choice.name, body.tool_choice.namespace) } }
       : body.tool_choice || "auto";
     if (typeof body.parallel_tool_calls === "boolean") chatBody.parallel_tool_calls = body.parallel_tool_calls;
   }
@@ -288,7 +298,7 @@ async function handleResponses(req, res) {
   }
 
   if (!stream) {
-    const completion = await collectChatStream(upstream);
+    const completion = await collectChatStream(upstream, toolNames);
     return json(res, 200, completeResponse(responseId, created, model, completion.output, completion.usage));
   }
 
@@ -313,6 +323,7 @@ async function handleResponses(req, res) {
     message: null,
     text: "",
     toolCalls: new Map(),
+    toolNames,
   };
 
   await streamChatAsResponses(upstream, res, state, controller.signal);
@@ -365,9 +376,9 @@ function completeResponse(responseId, created, model, output, usage) {
   };
 }
 
-async function collectChatStream(upstream) {
+async function collectChatStream(upstream, toolNames) {
   const output = [];
-  const state = { output, message: null, text: "", toolCalls: new Map() };
+  const state = { output, message: null, text: "", toolCalls: new Map(), toolNames };
   for await (const chunk of parseSse(upstream.body)) {
     applyChatChunk(chunk, null, state);
   }
@@ -527,6 +538,8 @@ function finalizeState(res, state) {
   if (!state.message && state.toolCalls.size === 0) throw new Error("LM Studio returned no text or tool calls. Check reasoning/output limits and model template.");
   for (const item of state.toolCalls.values()) {
     if (!item.name) throw new Error("LM Studio returned an unnamed tool call.");
+    const original = state.toolNames?.get(item.name);
+    if (original) Object.assign(item, original);
     try { JSON.parse(item.arguments); } catch { throw new Error(`Invalid tool arguments for ${item.name}.`); }
   }
   if (state.message) {

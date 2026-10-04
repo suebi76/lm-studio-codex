@@ -39,7 +39,7 @@ before(async () => {
       return;
     }
     if (mode === 'malformed') { res.end('data: invalid\n\n'); return; }
-    const delta = mode === 'tool' ? { tool_calls: [{ index: 0, id: 'call1', function: { name: 'ping', arguments: '{"ok":true}' } }] } : { content: mode === 'empty' ? '' : 'Gruesse \u00e4' };
+    const delta = mode === 'tool' ? { tool_calls: [{ index: 0, id: 'call1', function: { name: received.tools?.[0].function.name || 'ping', arguments: '{"ok":true}' } }] } : { content: mode === 'empty' ? '' : 'Gruesse \u00e4' };
     res.write(`data: ${JSON.stringify({ choices: [{ delta }] })}\r\n\r\n`);
     if (mode === 'truncated') { res.end(); return; }
     res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: mode === 'length' ? 'length' : mode === 'tool' ? 'tool_calls' : 'stop' }] })}\r\n\r\n`);
@@ -82,6 +82,23 @@ test('tool choice and JSON output schema reach upstream', async () => {
   assert.equal(received.tool_choice, 'required');
   assert.equal(received.parallel_tool_calls, false);
   assert.equal(received.response_format.json_schema.name, 'test');
+});
+test('namespace tools preserve identity, forced choice and history', async () => {
+  const tools = [{ type: 'namespace', name: 'mcp__lmstudio_web', tools: [{ type: 'function', name: 'web_search_exa' }] }];
+  mode = 'tool';
+  try {
+    const result = await (await request({ tools, tool_choice: { type: 'function', namespace: tools[0].name, name: 'web_search_exa' } })).json();
+    const call = result.output[0];
+    assert.equal(call.namespace, tools[0].name);
+    assert.equal(call.name, 'web_search_exa');
+    const alias = received.tools[0].function.name;
+    assert.ok(alias.length <= 64);
+    assert.equal(received.tool_choice.function.name, alias);
+    assert.equal(convertResponsesInputToChat({ input: [call] })[0].tool_calls[0].function.name, alias);
+    const stream = await (await request({ tools, stream: true })).text();
+    assert.match(stream, /"namespace":"mcp__lmstudio_web"/);
+    assert.match(stream, /response.completed/);
+  } finally { mode = 'ok'; }
 });
 test('tool calls finish with valid arguments', async () => {
   mode = 'tool'; const result = await (await request()).json();

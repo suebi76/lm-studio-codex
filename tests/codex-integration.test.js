@@ -11,13 +11,29 @@ const { resolveCodex, defaults } = require('../install/lib/run-codex');
 test('installed Codex speaks to gateway and resumes an explicit session', { skip: process.env.LMSC_TEST_CODEX !== '1', timeout: 60000 }, async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'lmsc-integration-'));
   const requests = [];
+  let webCalls = 0;
+  const mcp = http.createServer(async (req, res) => {
+    let body = ''; for await (const chunk of req) body += chunk;
+    const message = JSON.parse(body);
+    if (message.id === undefined) { res.writeHead(202); res.end(); return; }
+    let result;
+    if (message.method === 'initialize') result = { protocolVersion: '2025-03-26', capabilities: { tools: {} }, serverInfo: { name: 'test-web', version: '1' } };
+    else if (message.method === 'tools/list') result = { tools: [{ name: 'web_search_exa', description: 'TEST_WEB_SEARCH', inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } }] };
+    else if (message.method === 'tools/call') { webCalls++; result = { content: [{ type: 'text', text: 'LMSC_WEB_OK' }] }; }
+    else result = {};
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({ jsonrpc: '2.0', id: message.id, result }));
+  });
+  mcp.listen(0, '127.0.0.1'); await once(mcp, 'listening');
   const upstream = http.createServer(async (req, res) => {
     if (req.url === '/api/v1/models') { res.end(JSON.stringify({ models: [{ type: 'llm', loaded_instances: [{ id: 'test-model' }] }] })); return; }
     let text = ''; for await (const chunk of req) text += chunk;
     requests.push(JSON.parse(text));
     res.setHeader('content-type', 'text/event-stream');
-    if (requests.length === 1) {
-      const delta = { tool_calls: [{ index: 0, id: 'integration-call', type: 'function', function: { name: 'exec_command', arguments: JSON.stringify({ cmd: 'echo LMSC_TOOL_OK' }) } }] };
+    if (requests.length <= 2) {
+      const web = requests.at(-1).tools?.find(tool => tool.function.description.includes('TEST_WEB_SEARCH'));
+      const fn = requests.length === 1 ? { name: 'exec_command', arguments: JSON.stringify({ cmd: 'echo LMSC_TOOL_OK' }) } : { name: web?.function.name, arguments: JSON.stringify({ query: 'test' }) };
+      const delta = { tool_calls: [{ index: 0, id: `integration-call-${requests.length}`, type: 'function', function: fn }] };
       res.end(`data: ${JSON.stringify({ choices: [{ delta, finish_reason: null }] })}\n\ndata: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\ndata: [DONE]\n\n`);
       return;
     }
@@ -33,7 +49,7 @@ test('installed Codex speaks to gateway and resumes an explicit session', { skip
   const port = Number(chunk.toString().trim());
   const runtime = resolveCodex();
   async function run(session) {
-    const args = [...runtime.prefix, ...defaults(), '-c', 'model_provider="test_local"',
+    const args = [...runtime.prefix, ...defaults(), '-c', `mcp_servers.lmstudio_web={url="http://127.0.0.1:${mcp.address().port}",enabled=true,required=true,default_tools_approval_mode="approve"}`, '-c', 'model_provider="test_local"',
       '-c', 'model_providers.test_local.name="test"', '-c', `model_providers.test_local.base_url="http://127.0.0.1:${port}/v1"`,
       '-c', 'model_providers.test_local.wire_api="responses"', '-c', 'model_providers.test_local.stream_max_retries=0',
       '-c', 'approval_policy="never"', 'exec', '--sandbox', 'read-only', '--skip-git-repo-check'];
@@ -51,11 +67,14 @@ test('installed Codex speaks to gateway and resumes an explicit session', { skip
   }
   try {
     const thread = await run(); assert.ok(thread); await run(thread);
-    assert.equal(requests.length, 3); assert.ok(requests[2].messages.length > requests[0].messages.length);
+    assert.equal(requests.length, 4); assert.ok(requests[3].messages.length > requests[0].messages.length);
     assert.ok(requests[1].messages.some(message => message.role === 'tool' && message.content.includes('LMSC_TOOL_OK')));
+    assert.equal(webCalls, 1);
+    assert.ok(requests[2].messages.some(message => message.role === 'tool' && message.content.includes('LMSC_WEB_OK')));
     console.log('Codex tools:', requests[0].tools?.map(tool => tool.function.name).join(', '));
   } finally {
     gateway.kill(); await once(gateway, 'exit'); upstream.closeAllConnections(); await new Promise(resolve => upstream.close(resolve));
+    mcp.closeAllConnections(); await new Promise(resolve => mcp.close(resolve));
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });

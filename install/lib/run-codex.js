@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
 const readline = require('node:readline');
+const { webConfigArgs } = require('./web-mcp');
 
 function resolveCodex() {
   if (process.platform !== 'win32') return { command: 'codex', prefix: [] };
@@ -21,7 +22,7 @@ function defaults() {
     '-c', 'model_providers.lmstudio_gateway.wire_api="responses"',
     '-c', 'model_providers.lmstudio_gateway.requires_openai_auth=false',
     '-c', 'model_providers.lmstudio_gateway.stream_max_retries=0',
-    '-c', 'web_search="disabled"', '-c', 'features.multi_agent=false', '-c', 'features.plugins=false'];
+    '-c', 'web_search="disabled"', '-c', 'features.multi_agent=false', '-c', 'features.plugins=false', ...webConfigArgs()];
   const context = Number(process.env.LMSTUDIO_CODEX_CONTEXT);
   if (Number.isSafeInteger(context) && context > 0) {
     args.push('-c', `model_context_window=${context}`, '-c', `model_auto_compact_token_limit=${Math.floor(context * 0.7)}`);
@@ -71,6 +72,7 @@ async function runTask(runtime, args, sessionId, prompt, display = true) {
       console.error(`[lm-studio] ${event.message || event.error?.message || JSON.stringify(event)}`);
     }
     if (event.type === 'item.started' && event.item?.type === 'command_execution') console.error(`[lm-studio] Command: ${event.item.command}`);
+    if (event.type === 'item.started' && event.item?.type === 'mcp_tool_call') console.error(`[lm-studio] MCP: ${event.item.server}/${event.item.tool}`);
     if (event.type === 'item.completed') {
       const item = event.item || {};
       if (item.type === 'agent_message' && item.text) { answered = true; console.log(item.text); }
@@ -78,6 +80,7 @@ async function runTask(runtime, args, sessionId, prompt, display = true) {
         if (item.aggregated_output) process.stdout.write(item.aggregated_output + '\n');
         console.error(`[lm-studio] Command finished: ${item.exit_code ?? item.status}`);
       } else if (item.type === 'file_change') console.error(`[lm-studio] Files: ${JSON.stringify(item.changes)}`);
+      else if (item.type === 'mcp_tool_call') console.error(`[lm-studio] MCP ${item.tool}: ${item.status}${item.error ? ` - ${JSON.stringify(item.error)}` : ''}`);
     }
   });
   try {
@@ -104,6 +107,9 @@ async function main(args = process.argv.slice(2)) {
     return 0;
   }
   const runtime = resolveCodex();
+  console.error(process.env.LMSTUDIO_CODEX_WEB === '0'
+    ? '[lm-studio] Web MCP disabled explicitly (offline mode).'
+    : '[lm-studio] Web MCP: Exa search and page reading enabled. Search queries and requested URLs are sent to Exa.');
   if (args.length) {
     if (!args.includes('--help') && !args.includes('-h')) await refreshModel();
     if (!['exec', 'resume', 'fork', 'review', '--codex', '--tui'].includes(args[0])) {

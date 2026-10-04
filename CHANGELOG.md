@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Enable Exa MCP web search and page reading automatically in all managed Codex launch modes, with explicit offline opt-out and optional environment-backed API key.
+- Translate namespaced MCP functions through the chat gateway, preserving tool identity, history and forced tool choice.
+- Show MCP calls and failures in the terminal; include MCP connection/catalog checks in Doctor.
+- Add namespace, MCP diagnostic and installed-Codex tool round-trip regression coverage.
+
 ## v0.4.0 - 2026-10-04
 
 - Shared Node.js session launcher with explicit session resumption, visible output/progress, exit codes and empty-answer detection.

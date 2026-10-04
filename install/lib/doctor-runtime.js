@@ -4,6 +4,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { parseSse } = require('./lmstudio-responses-gateway');
 const { resolveCodex, defaults } = require('./run-codex');
+const { checkWeb } = require('./web-mcp');
 const seconds = Number(process.env.LMSTUDIO_DOCTOR_TIMEOUT_SEC || 300);
 if (!Number.isFinite(seconds) || seconds <= 0) throw new Error('LMSTUDIO_DOCTOR_TIMEOUT_SEC must be positive.');
 let warnings = 0;
@@ -54,6 +55,12 @@ async function codexSmoke() {
 }
 
 async function main() {
+  if (process.env.LMSTUDIO_CODEX_WEB === '0') warn('Web MCP disabled explicitly; internet tools not tested.');
+  else {
+    console.log('[lm-studio] Checking web MCP connection and tool catalog...');
+    await checkWeb();
+    pass('Web search and page-reading MCP tools are available.');
+  }
   console.log(`[lm-studio] Runtime tests: streaming, JSON, tool round trip, Codex. Timeout: ${seconds}s per check.`);
   console.log('[lm-studio] Testing streamed text...');
   const text = await request('Reply exactly: LM_STUDIO_GATEWAY_OK');
