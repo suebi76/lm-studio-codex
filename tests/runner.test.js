@@ -35,3 +35,15 @@ test('context override is bounded to positive integers', () => {
     process.env.LMSTUDIO_CODEX_CONTEXT = 'NaN'; assert.ok(!defaults().some(x => x.startsWith('model_context_window=')));
   } finally { if (old === undefined) delete process.env.LMSTUDIO_CODEX_CONTEXT; else process.env.LMSTUDIO_CODEX_CONTEXT = old; }
 });
+
+test('Codex idle timeout exceeds the gateway budget', () => {
+  const old = process.env.LMSTUDIO_CODEX_TIMEOUT_MS;
+  try {
+    delete process.env.LMSTUDIO_CODEX_TIMEOUT_MS;
+    assert.ok(defaults().includes('model_providers.lmstudio_gateway.stream_idle_timeout_ms=610000'));
+    process.env.LMSTUDIO_CODEX_TIMEOUT_MS = '900000';
+    assert.ok(defaults().includes('model_providers.lmstudio_gateway.stream_idle_timeout_ms=910000'));
+    process.env.LMSTUDIO_CODEX_TIMEOUT_MS = 'NaN';
+    assert.throws(defaults, /LMSTUDIO_CODEX_TIMEOUT_MS/);
+  } finally { if (old === undefined) delete process.env.LMSTUDIO_CODEX_TIMEOUT_MS; else process.env.LMSTUDIO_CODEX_TIMEOUT_MS = old; }
+});

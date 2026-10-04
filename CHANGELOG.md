@@ -6,6 +6,7 @@
 - Translate namespaced MCP functions through the chat gateway, preserving tool identity, history and forced tool choice.
 - Show MCP calls and failures in the terminal; include MCP connection/catalog checks in Doctor.
 - Add namespace, MCP diagnostic and installed-Codex tool round-trip regression coverage.
+- Align Codex stream idle timeout with the gateway limit for slow local prompt processing.
 
 ## v0.4.0 - 2026-10-04
 

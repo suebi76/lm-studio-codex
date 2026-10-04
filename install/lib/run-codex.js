@@ -16,12 +16,15 @@ function resolveCodex() {
 }
 
 function defaults() {
+  const timeout = Number(process.env.LMSTUDIO_CODEX_TIMEOUT_MS || 600000);
+  if (!Number.isSafeInteger(timeout) || timeout < 100) throw new Error('LMSTUDIO_CODEX_TIMEOUT_MS must be an integer of at least 100.');
   const args = ['-c', 'model="lmstudio-loaded"', '-c', 'model_provider="lmstudio_gateway"',
     '-c', 'model_providers.lmstudio_gateway.name="LM Studio local"',
     '-c', 'model_providers.lmstudio_gateway.base_url="http://127.0.0.1:18123/v1"',
     '-c', 'model_providers.lmstudio_gateway.wire_api="responses"',
     '-c', 'model_providers.lmstudio_gateway.requires_openai_auth=false',
     '-c', 'model_providers.lmstudio_gateway.stream_max_retries=0',
+    '-c', `model_providers.lmstudio_gateway.stream_idle_timeout_ms=${timeout + 10000}`,
     '-c', 'web_search="disabled"', '-c', 'features.multi_agent=false', '-c', 'features.plugins=false', ...webConfigArgs()];
   const context = Number(process.env.LMSTUDIO_CODEX_CONTEXT);
   if (Number.isSafeInteger(context) && context > 0) {

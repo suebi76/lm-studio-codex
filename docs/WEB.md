@@ -38,6 +38,7 @@ Set the variable back to `1` to restore web tools. Restart the running launcher 
 - Startup failure: check connectivity, proxy/firewall access to `mcp.exa.ai`, then run Doctor. Use explicit offline mode when necessary.
 - Tool error or quota: the error is shown in the terminal. Do not treat a model's unsupported claim of successful research as evidence; ask for source URLs.
 - Tool calls unavailable after changing model: run Doctor. The configuration stays active across model changes, but the new model must support reliable function calls.
+- Slow first response: local models must process the Codex instructions and tool schemas before answering. The default gateway budget is ten minutes per generation; Codex's idle budget follows it with a short grace period. `LMSTUDIO_CODEX_TIMEOUT_MS` adjusts this budget, not model speed.
 - Existing installations: update the repository, then restart `lm-studio`. No reinstall is required when global commands already reference this folder.
 
 References: [Exa MCP documentation](https://exa.ai/docs/get-started/exa-mcp), [Codex MCP documentation](https://developers.openai.com/codex/mcp).
